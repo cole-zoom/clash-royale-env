@@ -3228,6 +3228,9 @@ tools/audit/         Standalone measurement instruments for the C++ engine,
                        in one binary, so the comparison cannot be confounded by
                        the gameplay fixes that shipped alongside; also sweeps
                        8,572 cells proving the two answer identically.
+  card_table.cpp       Writes docs/CARDS.md, one row per registered card, read
+                       off the entities each card spawns. Rerun it after any
+                       card change; the file is generated, never hand-edited.
   verify_pyd.py        Post-rebuild gate: proves python_ai/clash_royale_env.pyd
                        actually carries the current engine, which the C++ suite
                        cannot tell you. Run it before any training run.

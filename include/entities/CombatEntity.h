@@ -994,6 +994,9 @@ protected:
 public:
     float getAttackRange() const { return attackRange; }
     int getAttackCooldown() const { return attackCooldown; }
+    // The registry's damage, before the ramp, charge and buff state
+    // getCurrentDamage applies (tools/audit/card_table.cpp).
+    int getBaseDamage() const { return damage; }
 
     // Ticks engaged with the current target, for the deepCopy divergence tests
     // (perception/UPSTREAM_REQUESTS.md item 17). Its only other proxy,

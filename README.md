@@ -57,7 +57,8 @@ a live match off the screen and replays it inside the engine.
 **Engine** (`include/`, `src/`)
 - **132 cards and 41 Evolutions**: troops, buildings, spells, spawners,
   Champions and their abilities, death effects, knockback, slows, stuns and
-  rolling spells.
+  rolling spells. Every card's stats are in [`docs/CARDS.md`](docs/CARDS.md),
+  generated from the engine.
 - **Real-game timing**: 10 ticks per second, deploy time, King Tower
   activation, and 1×/2×/3× elixir phases on the real schedule.
 - **Movement speeds calibrated against recorded real matches**, and

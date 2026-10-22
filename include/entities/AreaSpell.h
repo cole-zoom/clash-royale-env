@@ -98,6 +98,20 @@ public:
 
     bool isTargetable() const override { return false; }
 
+    // Read-only views of the spell's stats, for tools/audit/card_table.cpp.
+    float getRadius() const { return radius; }
+    int getDamage() const { return damage; }
+    bool isGroundOnly() const { return groundOnly; }
+    int getTotalHits() const { return totalHits; }
+    int getTickInterval() const { return tickInterval; }
+    bool isAllyBuff() const { return buffsAllies; }
+    bool isAllyClone() const { return clonesAllies; }
+    bool hasOnHit() const { return onHit != nullptr; }
+    bool hasTieredDamage() const { return tieredDamage; }
+    int getTierSingleDamage() const { return tierSingleDamage; }
+    int getTierFewDamage() const { return tierFewDamage; }
+    int getTierManyDamage() const { return tierManyDamage; }
+
     // For Board::deepCopy: a spell mid-fuse or mid-volley resumes where the
     // original is.
     std::shared_ptr<Entity> snapshot() const override {
