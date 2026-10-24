@@ -1,4 +1,6 @@
 #pragma once
+#include "SpellTowerDamage.h"
+#include "SpawnFormations.h"
 #include <string>
 #include <functional>
 #include <unordered_map>
@@ -103,6 +105,9 @@ inline constexpr int CARD_ID_COUNT = 185;
 class CardRegistry {
 private:
     std::unordered_map<int, CardDefinition> cards;
+    // A read-only copy of each registered card's stats (ClashEnv's get_card_stats), for checking them against
+    // published data. Gameplay never reads it: spawnEntity captures its own copy.
+    std::unordered_map<int, CardStats> statsById;
 
     static CardStats troop(int id, std::string name, float cost, Archetype archetype,
         int hp, float speed, float attackRange, int damage, int attackCooldown, char symbol) {
@@ -395,7 +400,22 @@ private:
         return troop(-42, "Souldier", 0.0f, Archetype::MeleeSquad, 81, 0.7f, 1.2f, 133, 18, 'Q');
     }
 
-    void add(const CardStats& stats) {
+    // Spells hit a Crown Tower for a published fraction of their damage (SpellTowerDamage.h, generated from
+    // RoyaleAPI cr-api-data); a card's own explicit value (Poison's 21) wins. `id`: whose fraction (an
+    // Evolution uses its base card's).
+    // ... and squads deploy in the formation measured on the replays (SpawnFormations.h).
+    static CardStats withCrownTowerDamage(CardStats stats, int id) {
+        if (stats.archetype == Archetype::Spell && stats.spellCrownTowerDamage < 0) {
+            const float frac = crownTowerFractionForCard(id);
+            if (frac >= 0.0f) stats.spellCrownTowerDamage = static_cast<int>(stats.damage * frac + 0.5f);
+        }
+        stats.spawnOffsets = fittedOffsets(id, stats.spawnOffsets);
+        return stats;
+    }
+
+    void add(const CardStats& statsIn) {
+        const CardStats stats = withCrownTowerDamage(statsIn, statsIn.id);
+        statsById[stats.id] = stats;
         CardDefinition def;
         def.id = stats.id;
         def.name = stats.name;
@@ -429,6 +449,8 @@ private:
     // PlayerState::EvolutionSlotState).
     void addEvolution(int evolutionId, CardStats baseStats, CardStats evolvedStats,
             int cycleThreshold, int evolvedUses) {
+        baseStats = withCrownTowerDamage(baseStats, baseStats.id);
+        evolvedStats = withCrownTowerDamage(evolvedStats, baseStats.id);
         CardDefinition def;
         def.id = evolutionId;
         def.name = baseStats.name;
@@ -1703,6 +1725,11 @@ public:
             return &(it->second);
         }
         return nullptr;
+    }
+
+    const CardStats* getStats(int id) const {
+        auto it = statsById.find(id);
+        return it == statsById.end() ? nullptr : &it->second;
     }
 
     const std::unordered_map<int, CardDefinition>& getAllCards() const {

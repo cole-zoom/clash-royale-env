@@ -1,5 +1,6 @@
 #pragma once
 #include "LoadTimes.h"
+#include "SpellTowerDamage.h"
 #include "CardStats.h"
 #include "Board.h"
 #include "MeleeTroop.h"
@@ -28,6 +29,10 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     // spells and deploy effects do not, since a spell has its own delay.
     entity->deployTicksRemaining = stats.deployTicks;
     entity->loadTicks = loadTicksForCard(stats.id);
+    if (stats.archetype != Archetype::Spell) {
+        const float ct = crownTowerFractionForCard(stats.id);
+        if (ct >= 0.0f) entity->crownTowerFraction = ct;
+    }
     entity->isFlying = stats.isFlying;
     entity->targetsAir = stats.targetsAir;
     entity->deathEffect = stats.deathEffect;

@@ -229,6 +229,23 @@ PYBIND11_MODULE(clash_royale_env, m) {
         .def_readonly_static("DOUBLE_ELIXIR_TICK", &GameManager::DOUBLE_ELIXIR_TICK)
         .def_readonly_static("TRIPLE_ELIXIR_TICK", &GameManager::TRIPLE_ELIXIR_TICK);
 
+    // A registered card's stats (read-only), for checking them against published data. Ticks and engine tiles.
+    m.def("get_card_stats", [](int cardId) {
+        const CardStats* s = CardRegistry::getInstance().getStats(cardId);
+        if (!s) throw std::invalid_argument("get_card_stats: unknown card id " + std::to_string(cardId));
+        py::dict d;
+        d["id"] = s->id; d["name"] = s->name; d["cost"] = s->cost;
+        d["hp"] = s->hp; d["damage"] = s->damage; d["attack_cooldown"] = s->attackCooldown;
+        d["attack_range"] = s->attackRange; d["speed"] = s->speed; d["sight_range"] = s->sightRange;
+        d["flying"] = s->isFlying; d["targets_air"] = s->targetsAir; d["deploy_ticks"] = s->deployTicks;
+        d["bodies"] = static_cast<int>(s->spawnOffsets.size()); d["splash_radius"] = s->splashRadius;
+        d["spell_radius"] = s->spellRadius; d["spell_crown_tower_damage"] = s->spellCrownTowerDamage;
+        d["spell_hits"] = s->spellRemainingHits;
+        py::list offs;
+        for (const auto& o : s->spawnOffsets) offs.append(py::make_tuple(o.x, o.y));
+        d["spawn_offsets"] = offs;
+        return d;
+    }, py::arg("card_id"));
     // Calibration switch (CombatEntity::sightEdgeToEdge): default false.
     m.def("set_sight_edge_to_edge", [](bool on) { CombatEntity::sightEdgeToEdge = on; }, py::arg("on"));
     m.def("get_sight_edge_to_edge", []() { return CombatEntity::sightEdgeToEdge; });

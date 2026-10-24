@@ -113,6 +113,8 @@ public:
     // retarget restarts the windup. Off for every unit while loadTimesEnabled
     // is false (the engine before 2026-10-23).
     int loadTicks = 0;
+    // The fraction of a direct hit's damage dealt to a Crown Tower (SpellTowerDamage.h: the Miner's 25%).
+    float crownTowerFraction = 1.0f;
     int windupTargetId = -1;
     int windupTicksLeft = 0;
     static inline bool loadTimesEnabled = true;
