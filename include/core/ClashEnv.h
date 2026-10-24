@@ -38,6 +38,27 @@ struct SelfPlayStepResult {
 // unused observation costs far more than the physics tick
 // (perception/UPSTREAM_REQUESTS.md item 21). Both entry points share
 // runSelfPlayTicks, so they cannot diverge; only the return differs.
+// One live entity on the board, for callers that compare the simulation with
+// something outside it (unit tracks from a real replay). Read-only; positions
+// in board coordinates. cardId is -1 for towers and for bodies spawned by a
+// card's effects (Goblin Hut's Spear Goblins, a Golem's Golemites), which
+// carry their own name.
+struct UnitView {
+    int id;
+    int cardId;
+    std::string name;
+    int team;
+    float x;
+    float y;
+    int hp;
+    bool flying;
+    bool building;
+    bool tower;
+    bool targetable;   // false for spells in flight and projectiles
+    int deployTicks;   // ticks of deploy time left (0 for non-combat entities)
+    int targetId;      // the entity it is locked onto, -1 for none
+};
+
 struct SelfPlayFastResult {
     float reward0;
     bool done;
@@ -649,6 +670,22 @@ public:
 
     // The matching read.
     int getCurrentTick() const { return currentTick; }
+
+    // Every live entity, in board order (see UnitView). Read-only.
+    std::vector<UnitView> getUnits() const {
+        std::vector<UnitView> out;
+        for (const auto& e : game.getBoard().getEntities()) {
+            if (!e->isAlive()) continue;
+            UnitView u{e->id, e->cardId, e->name, e->team, e->position.x, e->position.y, e->hp,
+                       e->isFlying, e->isBuilding(), e->isTower(), e->isTargetable(), 0, -1};
+            if (const auto* c = dynamic_cast<const CombatEntity*>(e.get())) {
+                u.deployTicks = c->deployTicksRemaining;
+                u.targetId = c->getCurrentTargetId();
+            }
+            out.push_back(std::move(u));
+        }
+        return out;
+    }
 
     // The elixir phase in force (1.0 / 2.0 / 3.0), so readers need not know the
     // boundary ticks.
