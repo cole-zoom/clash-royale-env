@@ -15,6 +15,7 @@
 #include <tuple>
 #include <unordered_set>
 #include <cmath>
+#include <algorithm>
 
 struct StepResult {
     std::vector<float> observation;
@@ -728,6 +729,10 @@ inline std::vector<int> getAllCardIds() {
         if (def.isEvolution) continue;
         ids.push_back(id);
     }
+    // The registry is an unordered_map, whose iteration order differs between
+    // standard libraries (MSVC vs libc++): sort so every platform sees the same
+    // list, and so the seeded decks below are the same everywhere.
+    std::sort(ids.begin(), ids.end());
     return ids;
 }
 
@@ -743,6 +748,9 @@ inline std::vector<int> sampleRandomDeck(std::mt19937& rng) {
         else if (def.isChampion || def.isHero) specialUnitPool.push_back(id);
         else plainPool.push_back(id);
     }
+    std::sort(plainPool.begin(), plainPool.end());
+    std::sort(evolutionPool.begin(), evolutionPool.end());
+    std::sort(specialUnitPool.begin(), specialUnitPool.end());
 
     std::unordered_set<int> used;
     std::uniform_real_distribution<float> chance01(0.0f, 1.0f);
