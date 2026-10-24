@@ -252,6 +252,7 @@ TEST_CASE("RangedSquad archetype (Musketeer)", "[card_registry][archetype]") {
 }
 
 TEST_CASE("Executioner's axe hits its target twice: on arrival, then again on the return trip", "[card_registry][flying]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     Board board;
     auto enemy = std::make_shared<StationaryCombatant>(1, 5.0f, 6.0f, 1000, 1, 5.0f, 10, 10); // dist 1.0 from (5,5)
     spawn(board, enemy);
@@ -490,6 +491,7 @@ TEST_CASE("DefensiveBuilding archetype: targetsAir matches real-game data per ca
 }
 
 TEST_CASE("Inferno Tower's damage ramps up the longer it stays locked onto the same target", "[card_registry][ramp]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     Board board;
     auto enemy = std::make_shared<StationaryCombatant>(1, 5.0f, 6.0f, 1000000, 1, 5.0f, 10, 10); // dist 1.0 from (5,5)
     spawn(board, enemy);
@@ -677,6 +679,7 @@ TEST_CASE("The Log is ground-only and does not hit flying enemies, unlike Fireba
 }
 
 TEST_CASE("Ice Wizard is genuinely ranged: freeze lands with the arrow, not when it's fired", "[card_registry][on_hit]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     Board board;
     auto enemy = std::make_shared<StationaryCombatant>(1, 5.0f, 6.0f, 1000, 1, 5.0f, 10, 10); // distance 1.0 from (5,5)
     spawn(board, enemy);
@@ -703,6 +706,7 @@ TEST_CASE("Ice Wizard is genuinely ranged: freeze lands with the arrow, not when
 
 TEST_CASE("Ice Golem's slow is on its death explosion, never on its attack",
           "[card_registry][on_hit][regression]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     // An Ice Golem does not freeze what it hits; its slow belongs to the death
     // explosion (card 40). It targets buildings, whose only freeze-sensitive
     // property is their fire rate.
@@ -733,6 +737,7 @@ TEST_CASE("Ice Golem's slow is on its death explosion, never on its attack",
 }
 
 TEST_CASE("Electro Wizard stuns on hit via the on-hit decorator (freeze with slowFactor 0)", "[card_registry][on_hit]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     Board board;
     auto enemy = std::make_shared<StationaryCombatant>(1, 5.0f, 6.0f, 1000, 1, 5.0f, 10, 10); // distance 1.0 from (5,5)
     spawn(board, enemy);
@@ -761,6 +766,7 @@ TEST_CASE("Electro Wizard stuns on hit via the on-hit decorator (freeze with slo
 }
 
 TEST_CASE("Electro Wizard splits its attack across the 2 closest enemies at half damage each", "[card_registry][flying]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     Board board;
     auto near = std::make_shared<StationaryCombatant>(1, 5.0f, 5.5f, 1000, 1, 5.0f, 10, 10);  // dist 0.5
     auto far = std::make_shared<StationaryCombatant>(2, 5.0f, 6.0f, 1000, 1, 5.0f, 10, 10);    // dist 1.0
@@ -953,6 +959,7 @@ TEST_CASE("A charging Battle Ram runs at twice its speed and hits for double",
 // game files: BombTowerProjectile radius 1.5, BombTowerBomb 3 tiles after
 // 3 s). It was a single-target tower with no death bomb. Item 35.
 TEST_CASE("Bomb Tower splashes, and drops a 3-second bomb when destroyed", "[card_registry][splash][death]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     SECTION("its bomb catches a troop next to the target, not one farther off") {
         Board board;
         CardRegistry::getInstance().getCard(27)->spawnEntity(5.0f, 5.0f, 0, board);
@@ -1025,6 +1032,7 @@ TEST_CASE("Evolved Battle Ram does not break: it keeps swinging at the building"
 }
 
 TEST_CASE("Inferno Dragon's beam damage ramps up like Inferno Tower's, while flying and air-targeting", "[card_registry][ramp][flying]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     Board board;
     auto enemy = std::make_shared<StationaryCombatant>(1, 5.0f, 6.0f, 1000000, 1, 5.0f, 10, 10); // dist 1.0 from (5,5)
     spawn(board, enemy);
@@ -1067,6 +1075,7 @@ TEST_CASE("Elixir Collector and the other spawner buildings deal no damage (spaw
 }
 
 TEST_CASE("Valkyrie's splash hits a second enemy standing near her primary target", "[card_registry][splash]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     Board board;
     auto primary = std::make_shared<DummyEntity>(1, 6.0f, 5.0f, 1000, 1, 'P'); // dist 1.0 from (5,5)
     auto nearby = std::make_shared<DummyEntity>(2, 6.0f, 5.5f, 1000, 1, 'N');  // 0.5 from primary, within her 1.5 splash
@@ -1539,6 +1548,7 @@ TEST_CASE("Mega Knight jumps to a distant target instead of walking, via the rea
 }
 
 TEST_CASE("Bowler's piercing line hits a bystander behind the primary target, not just around it", "[card_registry][line_splash]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     Board board;
     auto primary = std::make_shared<DummyEntity>(1, 5.0f, 8.0f, 100000, 1);   // dist 3.0 from (5,5)
     auto behindPrimary = std::make_shared<DummyEntity>(2, 5.0f, 9.5f, 100000, 1); // further along the same line

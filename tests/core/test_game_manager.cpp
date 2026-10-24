@@ -377,6 +377,7 @@ TEST_CASE("step()'s post-collision re-clamp respects riverIgnores (regression te
 // ---------------- statistics ----------------
 
 TEST_CASE("A full scripted mini-match produces sane getStatistics() output", "[game_manager][statistics]") {
+    NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
     GameManager game({ 0,1,2,3,4,5,6,7 }, { 0,1,2,3,4,5,6,7 });
     Board& board = game.getBoard();
 

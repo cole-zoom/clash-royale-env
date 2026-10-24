@@ -1,4 +1,5 @@
 #pragma once
+#include "LoadTimes.h"
 #include "CardStats.h"
 #include "Board.h"
 #include "MeleeTroop.h"
@@ -26,6 +27,7 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     // its own). Set here because every troop and building passes through;
     // spells and deploy effects do not, since a spell has its own delay.
     entity->deployTicksRemaining = stats.deployTicks;
+    entity->loadTicks = loadTicksForCard(stats.id);
     entity->isFlying = stats.isFlying;
     entity->targetsAir = stats.targetsAir;
     entity->deathEffect = stats.deathEffect;

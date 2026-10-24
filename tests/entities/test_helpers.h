@@ -97,3 +97,13 @@ public:
         applyCount++;
     }
 };
+
+// Turns the first-hit windup (CombatEntity::loadTimesEnabled) off for one
+// test's scope. For tests of another mechanic (splash, ramp, stun, ...) that
+// step a unit and expect its first hit at once; the windup itself is pinned in
+// tests/core/test_load_times.cpp.
+struct NoLoadTimes {
+    bool was = CombatEntity::loadTimesEnabled;
+    NoLoadTimes() { CombatEntity::loadTimesEnabled = false; }
+    ~NoLoadTimes() { CombatEntity::loadTimesEnabled = was; }
+};
