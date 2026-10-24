@@ -155,6 +155,10 @@ PYBIND11_MODULE(clash_royale_env, m) {
         // Clamped to [0, max_ticks]; sets both engine clocks.
         .def("set_current_tick", &ClashEnv::setCurrentTick, py::arg("tick"))
         .def("get_current_tick", &ClashEnv::getCurrentTick)
+        // Re-level a tower (slot 0 King, 1 left, 2 right): max hp, damage per
+        // shot, cooldown in ticks. Keeps the hp fraction. Defaults unchanged.
+        .def("set_tower_stats", &ClashEnv::setTowerStats, py::arg("team"), py::arg("slot"),
+             py::arg("max_hp"), py::arg("damage"), py::arg("cooldown_ticks"))
         // Every live entity (towers, troops, buildings, spells in flight), for
         // comparing a simulation with real unit tracks. Read-only.
         .def("get_units", &ClashEnv::getUnits)
@@ -225,6 +229,12 @@ PYBIND11_MODULE(clash_royale_env, m) {
         .def_readonly_static("DOUBLE_ELIXIR_TICK", &GameManager::DOUBLE_ELIXIR_TICK)
         .def_readonly_static("TRIPLE_ELIXIR_TICK", &GameManager::TRIPLE_ELIXIR_TICK);
 
+    // Calibration switch (CombatEntity::sightEdgeToEdge): default false.
+    m.def("set_sight_edge_to_edge", [](bool on) { CombatEntity::sightEdgeToEdge = on; }, py::arg("on"));
+    m.def("get_sight_edge_to_edge", []() { return CombatEntity::sightEdgeToEdge; });
+    // First-hit delays (CombatEntity::loadTimesEnabled, LoadTimes.h): default true.
+    m.def("set_load_times", [](bool on) { CombatEntity::loadTimesEnabled = on; }, py::arg("on"));
+    m.def("get_load_times", []() { return CombatEntity::loadTimesEnabled; });
     m.def("get_all_card_ids", &getAllCardIds,
         "All ids CardRegistry currently has registered (real, playable cards only).");
 

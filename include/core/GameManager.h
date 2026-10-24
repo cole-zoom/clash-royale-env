@@ -372,6 +372,16 @@ public:
     //
     // Takes engine-absolute hp. Real accounts' tower levels differ per player,
     // so perception reports a fraction and multiplies by getTowerMaxHp().
+    // Re-level one tower (see Tower::setStats). For matching the towers to the
+    // card levels the registry's stats are taken at; refuses a missing or
+    // destroyed tower.
+    bool setTowerStats(int team, int slot, int maxHp, int damage, int cooldownTicks) {
+        Tower* t = findTower(team, slot);
+        if (t == nullptr || !t->isAlive() || maxHp <= 0 || damage < 0 || cooldownTicks <= 0) return false;
+        t->setStats(maxHp, damage, cooldownTicks);
+        return true;
+    }
+
     bool setTowerHp(int team, int slot, float hp) {
         Tower* t = findTower(team, slot);
         if (t == nullptr || !t->isAlive()) return false;
