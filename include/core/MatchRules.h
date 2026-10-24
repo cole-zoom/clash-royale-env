@@ -12,10 +12,8 @@ public:
         int loserTeam;
     };
 
-    // The end of regulation: 1800 ticks = 3:00, the real schedule. The same
-    // instant as GameManager::TRIPLE_ELIXIR_TICK, one fact with two
-    // consequences; GameManager static_asserts they agree, since this header
-    // knows nothing about elixir.
+    // The end of regulation: 1800 ticks = 3:00, the real schedule. Triple
+    // elixir starts a minute later (GameManager::TRIPLE_ELIXIR_TICK).
     static constexpr int REGULATION_END_TICK = 1800;
 
     // Surviving towers per side, and the weakest one's hp. Uses isTower(),

@@ -825,7 +825,9 @@ TEST_CASE("elixir regen follows the real-game 1x/2x/3x phase schedule",
 
     // The boundaries against the 10-ticks-per-second conversion.
     REQUIRE(GameManager::DOUBLE_ELIXIR_TICK == 120 * 10);   // 2:00
-    REQUIRE(GameManager::TRIPLE_ELIXIR_TICK == 180 * 10);   // 3:00
+    REQUIRE(GameManager::TRIPLE_ELIXIR_TICK == 240 * 10);   // 4:00
+    // Overtime begins at 3:00 still at double: the first minute of overtime.
+    REQUIRE(GameManager::elixirMultiplierAtTick(MatchRules::REGULATION_END_TICK) == 2.0f);
     REQUIRE(GameManager::MAX_ELIXIR_MULTIPLIER
             == GameManager::elixirMultiplierAtTick(GameManager::TRIPLE_ELIXIR_TICK));
 }

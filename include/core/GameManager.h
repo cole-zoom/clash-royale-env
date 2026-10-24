@@ -178,22 +178,25 @@ private:
 
 public:
     // --- elixir phases ---
-    // The real schedule: 3:00 of regular time with double elixir from 2:00,
-    // then overtime at triple.
+    // The real ladder schedule: 3:00 of regular time with double elixir from
+    // 2:00; overtime (from 3:00) stays at double for its first minute, then
+    // triple from 4:00.
     //
     //   0:00 - 2:00   1x   one elixir per 2.857 s
-    //   2:00 - 3:00   2x   one per 1.429 s
-    //   3:00 +        3x   one per 0.952 s
+    //   2:00 - 4:00   2x   one per 1.429 s
+    //   4:00 +        3x   one per 0.952 s
+    //
+    // Measured on 586 recorded ladder / TV Royale replays (bot-77, 2026-10-23:
+    // the elixir multiplier read off the screen): 2x from 120.0 s, 3x from
+    // 240.7 s at the median, 51 of 159,041 readings off this schedule. It was
+    // triple at 3:00, the end of regulation, before.
     //
     // In ticks (10 ticks = 1 s, perception/timebase.py). Public because
     // ClashEnv, the bindings and GameLogger all need it.
     static constexpr int DOUBLE_ELIXIR_TICK = 1200;   // 2:00
-    static constexpr int TRIPLE_ELIXIR_TICK = 1800;   // 3:00
-    // Triple elixir and the end of regulation are one instant, which MatchRules
-    // owns. Asserted rather than derived, since MatchRules knows nothing about
-    // elixir.
-    static_assert(TRIPLE_ELIXIR_TICK == MatchRules::REGULATION_END_TICK,
-                  "overtime and triple elixir both begin when regulation ends");
+    static constexpr int TRIPLE_ELIXIR_TICK = 2400;   // 4:00, one minute into overtime
+    static_assert(TRIPLE_ELIXIR_TICK > MatchRules::REGULATION_END_TICK,
+                  "triple elixir starts inside overtime, not when it begins");
 
     // The largest multiplier, and the normaliser of the observation scalar;
     // bound so perception's encoder divides by the same number.
