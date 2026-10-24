@@ -88,9 +88,12 @@ def run_path(name):
 
     A different anchor from `weights_path` on purpose; `base_trainer` deletes
     `log_dir` on a non-resume start, so a wrong anchor here is destructive.
+    `CLASH_RUN_ROOT` (absolute) moves the anchor, so a run hosted by another
+    project keeps runs/, replays/ and both snapshot pools in its own tree.
     """
+    root = os.environ.get("CLASH_RUN_ROOT") or python_ai.REPO_ROOT
     return name if os.path.isabs(name) else os.path.join(
-        python_ai.REPO_ROOT, *name.split("/"))
+        root, *name.split("/"))
 
 
 # The run's CLASH_* configuration, stamped into every checkpoint. These
@@ -99,7 +102,7 @@ def run_path(name):
 # flagged.
 OPERATIONAL_SETTINGS = frozenset({
     "CLASH_WEIGHTS", "CLASH_LOGDIR", "CLASH_SAVE_EVERY", "CLASH_SEED",
-    "CLASH_NUM_ENVS",
+    "CLASH_NUM_ENVS", "CLASH_RUN_ROOT",
 })
 #: Compared on its resolved value in BaseTrainer.restore_common: names and ids
 #: spell the same deck differently.
