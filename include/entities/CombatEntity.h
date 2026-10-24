@@ -107,6 +107,16 @@ public:
     // snapshots keep the exact remaining deploy time.
     int deployTicksRemaining = 0;
 
+    // First-hit delay (the card's load time, LoadTimes.h): on locking onto a
+    // new target the unit winds up this many ticks before its first hit;
+    // later hits on the same target follow the attack cooldown. A stun or a
+    // retarget restarts the windup. Off for every unit while loadTimesEnabled
+    // is false (the engine before 2026-10-23).
+    int loadTicks = 0;
+    int windupTargetId = -1;
+    int windupTicksLeft = 0;
+    static inline bool loadTimesEnabled = true;
+
     // Damage-over-time mark (Dart Goblin / Firecracker Evolutions; see
     // applyDot, PoisonOnHit). Ticks down independently of freeze and curse.
     int dotDamagePerTick = 0;
@@ -728,9 +738,24 @@ public:
             float effectiveAttackRange = effectiveRangeTo(target);
 
             if (dist <= effectiveAttackRange) {
+                // The first-hit windup (loadTicks): starts when the unit is in
+                // range of a target it has not wound up on; a stun restarts it.
+                bool windingUp = false;
+                if (loadTimesEnabled && loadTicks > 0) {
+                    if (stunned) {
+                        windupTargetId = -1;
+                    } else if (windupTargetId != target->id) {
+                        windupTargetId = target->id;
+                        windupTicksLeft = loadTicks;
+                    }
+                    if (windupTargetId == target->id && windupTicksLeft > 0) {
+                        windupTicksLeft--;
+                        windingUp = true;
+                    }
+                }
                 // Not while stunned: a stun holds the cooldown still, and a
                 // unit that was already ready must not swing through it.
-                if (!stunned && currentCooldown == 0.0f) {
+                if (!stunned && !windingUp && currentCooldown == 0.0f) {
                     // Effects are applied by performAttack, since when they
                     // fire depends on when the damage lands (at once for a
                     // direct hit, on arrival for a projectile).
@@ -917,8 +942,19 @@ protected:
     //
     // Takes the attacker's radius as a parameter so findTarget computes it
     // once.
+    // Calibration switch (default off = the strict rule above): sight measured
+    // edge to edge, sightRange + both radii, as the engine did before
+    // 2026-08-28. Process-wide; for fitting the engine to recorded matches.
+public:
+    static inline bool sightEdgeToEdge = false;
+protected:
+
     float effectiveSightWith(float myRadius, const Entity& target) const {
         const float attackReach = attackRange + myRadius + effectiveRadiusOf(target);
+        if (sightEdgeToEdge) {
+            const float edge = sightRange + myRadius + effectiveRadiusOf(target);
+            return attackReach > edge ? attackReach : edge;
+        }
         // Only for a card whose raw sightRange covers its raw attackRange,
         // which the catalogue guarantees. Otherwise the unit stays blind past
         // its sight, as test_combat_entity.cpp pins.
