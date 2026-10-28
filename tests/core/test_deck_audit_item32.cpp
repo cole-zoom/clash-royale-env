@@ -229,7 +229,7 @@ TEST_CASE("Giant Skeleton's bomb explodes 3.0 s after he dies, 886 in a 3-tile r
           "[item32][giant_skeleton][regression]") {
     Match m;
     auto gs = m.spawnCard(GIANT_SKELETON, 8.5f, 10.0f, 0).front();
-    REQUIRE(gs->hp == 3126); // 3361 x 0.93 (May 2026)
+    REQUIRE(gs->hp == 3361); // client giantskeleton.toml Hitpoints x 2.56 = 3361 (2026-10-28; the May 0.93 nerf is not in the installed client)
     m.step(10);
     // Surface test: radius 3 plus the 0.4 troop radius.
     auto near = m.dummy(8.5f + 2.0f, 10.0f, 1, 5000);

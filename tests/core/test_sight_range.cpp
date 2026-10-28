@@ -201,10 +201,10 @@ const SightRow SIGHT_CATALOG[] = {
         {  15, "Hog Rider", 9.5f },
         {  17, "Elite Barbarians", 5.5f },
         {  18, "Royal Giant", 7.5f },
-        {  19, "Golem", 7.0f },
+        {  19, "Golem", 7.5f },          // client golem.toml SightRange 7500 (2026-10-28)
         {  20, "Dart Goblin", 7.5f },
         {  21, "Lumberjack", 5.5f },
-        {  22, "Bowler", 4.0f },
+        {  22, "Bowler", 5.5f },         // client bowler.toml SightRange 5500 (2026-10-28)
         {  23, "Spear Goblins", 5.5f },
         {  24, "Skeletons", 5.5f },
         {  25, "Cannon", 5.5f },
@@ -259,7 +259,7 @@ const SightRow SIGHT_CATALOG[] = {
         {  81, "Battle Ram", 6.5f },   // official September 2026 notes: 5.5 -> 6.5
         {  82, "Royal Hogs", 9.5f },
         {  83, "Wall Breakers", 7.0f },
-        {  84, "Electro Giant", 5.5f },
+        {  84, "Electro Giant", 7.5f },  // client electrogiant.toml SightRange 7500 (2026-10-28)
         {  85, "Suspicious Bush", 7.5f },   // client suspicious_bush.toml SightRange 7500 (2026-10-28)
         {  86, "Rune Giant", 5.5f },
         {  87, "Ram Rider", 7.5f },
@@ -283,8 +283,8 @@ const SightRow SIGHT_CATALOG[] = {
         { 118, "Archer Queen", 5.5f },
         { 119, "Monk", 5.5f },
         { 120, "Little Prince", 5.5f },
-        { 121, "Goblinstein", 5.5f },
-        { 122, "Boss Bandit", 5.5f },
+        { 121, "Goblinstein", 7.5f },    // client SightRange 7500 (2026-10-28)
+        { 122, "Boss Bandit", 6.0f },    // client SightRange 6000 (2026-10-28)
         { 123, "Wall Breakers", 7.0f },
         { 125, "Skeletons", 5.5f },
         { 126, "Bats", 5.5f },
