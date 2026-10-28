@@ -9,8 +9,9 @@ TEST_CASE("sightEdgeToEdge adds both radii to sight, and defaults off", "[sight]
     std::vector<int> deck = {0, 1, 2, 3, 4, 5, 6, 7};
     ClashEnv env(deck, deck);
     env.reset();
-    env.inject(0, 9.0f, 8.0f, 0, -1.0f, 0);    // Knight, team 0
-    env.inject(0, 9.0f, 14.2f, 1, -1.0f, 0);   // Knight, team 1: 6.2 apart, past 5.5 sight, inside 5.5 + radii
+    env.inject(0, 9.0f, 6.2f, 0, -1.0f, 0);    // Knight, team 0
+    env.inject(0, 9.0f, 14.2f, 1, -1.0f, 0);   // Knight, team 1: 8.0 apart, past the 7.25 troop sight (5.5 + 1.75),
+                                               // inside 7.25 + both radii
     ClashEnv strict = env;
     env.stepSelfPlayFast(-1, 0, 0, -1, 0, 0, 1);
     auto locked = [](const ClashEnv& e) {

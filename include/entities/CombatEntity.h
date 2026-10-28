@@ -951,17 +951,28 @@ public:
     static inline bool sightEdgeToEdge = false;
 protected:
 
+    // Troop-on-troop acquisition reaches TROOP_SIGHT_BONUS further than the
+    // catalogued sight: measured on 363 kite events in 486 pro replays (bot-77
+    // scripts/measure_kites.py, 2026-10-28), pulls start at a median 5.2 tiles
+    // with a quarter beyond 6.3; one acquisition distance fits best at
+    // sight + 1.75 (most melee 5.5 -> 7.25: 72.5%, held-back 83.7%) against
+    // 60.6% / 76.7% at the bare 5.5. Only a troop seeing a troop: buildings,
+    // towers and building targets keep the catalogued value (their pulls were
+    // fitted separately, see Tower::getTargetingRadius). GAMEPLAY-AFFECTING.
+    static constexpr float TROOP_SIGHT_BONUS = 1.75f;
+
     float effectiveSightWith(float myRadius, const Entity& target) const {
+        const float sight = sightRange + ((!isBuilding() && !target.isBuilding()) ? TROOP_SIGHT_BONUS : 0.0f);
         const float attackReach = attackRange + myRadius + effectiveRadiusOf(target);
         if (sightEdgeToEdge) {
-            const float edge = sightRange + myRadius + effectiveRadiusOf(target);
+            const float edge = sight + myRadius + effectiveRadiusOf(target);
             return attackReach > edge ? attackReach : edge;
         }
         // Only for a card whose raw sightRange covers its raw attackRange,
         // which the catalogue guarantees. Otherwise the unit stays blind past
         // its sight, as test_combat_entity.cpp pins.
-        if (sightRange >= attackRange && attackReach > sightRange) return attackReach;
-        return sightRange;
+        if (sightRange >= attackRange && attackReach > sight) return attackReach;
+        return sight;
     }
 
     // Re-validates the locked target by id rather than re-scanning for the

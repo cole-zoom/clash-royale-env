@@ -63,9 +63,9 @@ TEST_CASE("CombatEntity::findTarget picks the closest enemy", "[combat_entity][t
 TEST_CASE("findTarget never picks an enemy beyond sightRange, even if it's the only one on the board",
         "[combat_entity][targeting][sight_range]") {
     Board board;
-    // Distance 7.0, outside the default 5.5: a huge attackRange does not let an
-    // attacker acquire what it cannot see.
-    auto farEnemy = std::make_shared<DummyEntity>(1, 0.0f, 7.0f, 1000, 1);
+    // Distance 9.0, outside the default 5.5 + the 1.75 troop-on-troop bonus: a
+    // huge attackRange does not let an attacker acquire what it cannot see.
+    auto farEnemy = std::make_shared<DummyEntity>(1, 0.0f, 9.0f, 1000, 1);
     spawn(board, farEnemy);
 
     auto attacker = std::make_shared<StationaryCombatant>(2, 0.0f, 0.0f, 100, 0, 20.0f, 50, 10); // huge attackRange
@@ -76,13 +76,14 @@ TEST_CASE("findTarget never picks an enemy beyond sightRange, even if it's the o
 
 TEST_CASE("sight is measured CENTRE-TO-CENTRE against the raw sightRange",
         "[combat_entity][targeting][sight_range][centre_to_centre]") {
-    // Sight is strict centre-to-centre: 5.5 means 5.5. Bounded from both sides:
-    // a uniformly blind engine fails the second REQUIRE, a radius-inflated one
-    // the first.
+    // Sight is strict centre-to-centre: against a troop it is the raw 5.5 plus
+    // the measured 1.75 troop-on-troop bonus (CombatEntity::TROOP_SIGHT_BONUS,
+    // 2026-10-28), so 7.25. Bounded from both sides: a uniformly blind engine
+    // fails the second REQUIRE, a radius-inflated one the first.
     Board board;
 
     SECTION("just OUTSIDE the raw sightRange: not acquired") {
-        auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 6.0f, 1000, 1);
+        auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 7.5f, 1000, 1);
         spawn(board, enemy);
         auto attacker = std::make_shared<StationaryCombatant>(
             2, 0.0f, 0.0f, 100, 0, 20.0f, 50, 10);
@@ -91,7 +92,7 @@ TEST_CASE("sight is measured CENTRE-TO-CENTRE against the raw sightRange",
     }
 
     SECTION("just INSIDE the raw sightRange: acquired") {
-        auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 5.4f, 1000, 1);
+        auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 7.1f, 1000, 1);
         spawn(board, enemy);
         auto attacker = std::make_shared<StationaryCombatant>(
             2, 0.0f, 0.0f, 100, 0, 20.0f, 50, 10);
@@ -103,7 +104,7 @@ TEST_CASE("sight is measured CENTRE-TO-CENTRE against the raw sightRange",
 
 TEST_CASE("sightRange is read per-instance, not a hardcoded constant", "[combat_entity][targeting][sight_range]") {
     Board board;
-    auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 3.0f, 1000, 1); // dist 3.0: inside the default, outside a custom 2.0
+    auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 4.0f, 1000, 1); // dist 4.0: inside the default, outside a custom 2.0 (+1.75)
     spawn(board, enemy);
 
     auto attacker = std::make_shared<StationaryCombatant>(2, 0.0f, 0.0f, 100, 0, 20.0f, 50, 10);
