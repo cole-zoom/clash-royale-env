@@ -18,13 +18,15 @@ public:
         return (symbol == 'R') ? 2.0f : 1.5f;
     }
 
-    // Target-selection footprint, larger than the collision radius and fitted
-    // to real play: a Hog with a Cannon 7-8 tiles off-lane keeps walking at the
-    // Princess Tower and diverts only at 6. Against a Cannon's 1.0 that needs
-    // 2.92 < r < 3.65; 3.3 is mid-band. The King's is scaled by the same 2.0 /
-    // 1.5 ratio as its collision radius.
+    // Target-selection footprint = the body (1.5 Princess, 2.0 King), measured
+    // on 667 building-pull events in 486 pro replays (bot-77
+    // scripts/measure_pulls.py, 2026-10-28): "pulled iff the building's edge is
+    // nearer than the tower's" fits 89.8% at 1.5 (held-back 89.7%) against 67.6%
+    // at the previous 3.3, which was fitted to one Hog-and-Cannon example and
+    // stopped a Goblin Hut in the middle from pulling a Giant in the lane
+    // (Giant 47% -> 85%). GAMEPLAY-AFFECTING: every pull and kite near a tower.
     float getTargetingRadius() const override {
-        return (symbol == 'R') ? 4.4f : 3.3f;
+        return getCollisionRadius();
     }
 
     bool isTower() const override { return true; }

@@ -483,7 +483,7 @@ TEST_CASE("the nearest-building rule holds for every catalogued sight range",
     INFO("card id " << card << ", catalogued sight " << sight);
 
     REQUIRE(driftAt(card, LANE_Y, 7.0f) == Catch::Approx(0.0f).margin(0.05f));
-    // 3.0 centre => rank 2.0 against the tower's 6.0 - 3.3 = 2.7.
+    // 3.0 centre => rank 2.0 against the tower's 6.0 - 1.5 = 4.5.
     REQUIRE(driftAt(card, LANE_Y, 3.0f) < -0.3f);
 }
 
