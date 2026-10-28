@@ -498,7 +498,7 @@ private:
             .withOffsets({ {0.0f, 0.0f}, {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} }));
 
         add(troop(10, "Valkyrie", 4.0f, Archetype::MeleeSquad, 1907, SPEED_MEDIUM, 1.2f, 266, 15, 'V')
-            .withSplash(1.5f)); // 360-degree swing
+            .withSplash(2.0f)); // 360-degree swing
 
         add(troop(12, "Skeleton Army", 3.0f, Archetype::MeleeSquad, 81, SPEED_FAST, 0.5f, 81, 11, 's')
             .withOffsets(skeletonArmyOffsets()));
@@ -567,7 +567,10 @@ private:
         add(troop(6, "Musketeer", 4.0f, Archetype::RangedSquad, 721, SPEED_MEDIUM, 6.0f, 217, 10, 'U')
             .withTargetsAir().withSightRange(6.0f));
         // Bomber is ground-only; so are Bowler, Sparky and Cannon Cart.
-        add(troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 304, SPEED_MEDIUM, 4.5f, 225, 18, 'b'));
+        // Splash radii audited against cr-api-data on 2026-10-28 (max of area_damage_radius and the projectile's
+        // radius): Bomber, Witch and Mortar had none, Princess and Valkyrie were 1.5 against 2.5 / 2.0.
+        add(troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 304, SPEED_MEDIUM, 4.5f, 225, 18, 'b')
+            .withSplash(1.5f));
         add(troop(11, "Wizard", 5.0f, Archetype::RangedSquad, 755, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
             .withTargetsAir().withSplash(1.5f));
         add(troop(20, "Dart Goblin", 3.0f, Archetype::RangedSquad, 261, SPEED_VERY_FAST, 6.5f, 151, 8, 'd')
@@ -770,7 +773,7 @@ private:
             .withSightRange(5.0f));
         add(troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
             .withTargetsAir()
-            .withSplash(1.5f).withSightRange(9.5f));
+            .withSplash(2.5f).withSightRange(9.5f));
         // Hunter: the real card fires 10 randomly spread pellets and no falloff
         // curve is published. withRangeFalloff is an invented deterministic
         // approximation: linear from full damage point-blank to half at max
@@ -815,7 +818,7 @@ private:
             .withTargetsAir()
             .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(furnaceFireSpiritStats())));
         add(troop(71, "Witch", 5.0f, Archetype::RangedSquad, 839, SPEED_MEDIUM, 5.5f, 135, 11, ':')
-            .withTargetsAir()
+            .withTargetsAir().withSplash(1.0f)
             .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())));
 
         // "Spirit" troops detonate on their first hit and vanish
@@ -937,7 +940,8 @@ private:
         add(building(92, "X-Bow", 6.0f, 1600, 'P', 11.5f, 43, 3)
             .withDeployDelay(35).withSightRange(11.5f));
         add(building(93, "Mortar", 4.0f, 1369, 'R', 11.5f, 266, 50)
-            .withMinRange(3.5f).withSightRange(11.5f)); // blind spot
+            .withMinRange(3.5f).withSightRange(11.5f) // blind spot
+            .withSplash(2.0f));
 
         // Spawner buildings do not attack in the real game: 0-damage structures
         // spawning via PeriodicSpawnEffect. Barbarian Hut: 3 every 15 s, plus
@@ -1178,8 +1182,8 @@ private:
         // Bomber: +25% hp (380). "Bouncy Bomb" bounces twice at full damage,
         // approximated as a 3-target full-damage split.
         addEvolution(127,
-            troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 304, SPEED_MEDIUM, 4.5f, 225, 18, 'b'),
-            troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 380, SPEED_MEDIUM, 4.5f, 225, 18, 'b')
+            troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 304, SPEED_MEDIUM, 4.5f, 225, 18, 'b').withSplash(1.5f),
+            troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 380, SPEED_MEDIUM, 4.5f, 225, 18, 'b').withSplash(1.5f)
                 .withSplitTargets(3).withSplitTargetsFullDamage(),
             2, 1);
 
@@ -1342,10 +1346,10 @@ private:
         // healing on her own hits, capped at 124% hp (1040).
         addEvolution(142,
             troop(71, "Witch", 5.0f, Archetype::RangedSquad, 839, SPEED_MEDIUM, 5.5f, 135, 11, ':')
-                .withTargetsAir()
+                .withTargetsAir().withSplash(1.0f)
                 .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())),
             troop(71, "Witch", 5.0f, Archetype::RangedSquad, 839, SPEED_MEDIUM, 5.5f, 135, 11, ':')
-                .withTargetsAir()
+                .withTargetsAir().withSplash(1.0f)
                 .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats()))
                 .withHealOnHit(20, 1040),
             2, 1);
@@ -1378,9 +1382,9 @@ private:
         // lingering slow zone on death is not modelled.
         addEvolution(145,
             troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
-                .withTargetsAir().withSplash(1.5f).withSightRange(9.5f),
+                .withTargetsAir().withSplash(2.5f).withSightRange(9.5f),
             troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
-                .withTargetsAir().withSplash(1.5f).withSightRange(9.5f)
+                .withTargetsAir().withSplash(2.5f).withSightRange(9.5f)
                 .withOnHit(std::make_shared<FreezeOnHit>(70, 0.7f)),
             2, 1);
 
@@ -1400,9 +1404,9 @@ private:
         // not sourced; the lingering zone is not modelled.
         addEvolution(147,
             troop(10, "Valkyrie", 4.0f, Archetype::MeleeSquad, 1907, SPEED_MEDIUM, 1.2f, 266, 15, 'V')
-                .withSplash(1.5f),
+                .withSplash(2.0f),
             troop(10, "Valkyrie", 4.0f, Archetype::MeleeSquad, 1907, SPEED_MEDIUM, 1.2f, 266, 15, 'V')
-                .withSplash(1.5f)
+                .withSplash(2.0f)
                 .withOnHitPull(5.5f, 2.0f, 50),
             2, 1);
 
