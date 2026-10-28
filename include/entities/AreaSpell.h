@@ -69,6 +69,10 @@ public:
     // spellTowerDamageMultiplier. Set after construction by
     // CardFactories::spawnSpell, like configureRoll.
     int crownTowerDamage = -1;
+    // Damage one application deals to any other building (Earthquake), when
+    // the card publishes one (CardStats::spellBuildingDamage). -1 keeps the
+    // troop damage. Set after construction like crownTowerDamage.
+    int buildingDamage = -1;
 
     // With a ring (Graveyard: 3.3 tiles), application k spawns at the k-th of
     // seven fixed points, cycled: the cast point, then six on the ring 60
@@ -205,7 +209,9 @@ public:
             }
             // Tower damage: the card's own Crown Tower value where it has one,
             // else scaled by spellTowerDamageMultiplier.
-            int dealt = entity->isTower() ? towerDamage(effectiveDamage) : effectiveDamage;
+            int dealt = entity->isTower() ? towerDamage(effectiveDamage)
+                : (entity->isBuilding() && buildingDamage >= 0) ? buildingDamage
+                : effectiveDamage;
             entity->takeDamage(dealt);
             if (knockback != 0.0f) {
                 if (knockback > 0.0f) {

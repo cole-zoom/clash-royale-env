@@ -66,6 +66,8 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     entity->auraBuffMultiplier = stats.auraBuffMultiplier;
     entity->auraBuffDurationTicks = stats.auraBuffDurationTicks;
     entity->healAllyAmount = stats.healAllyAmount;
+    entity->attackSequenceDamage = stats.attackSequenceDamage;
+    entity->attackSequencePushback = stats.attackSequencePushback;
     entity->dieAfterFirstHit = stats.dieAfterFirstHit;
     entity->chargeGrantsInvulnerability = stats.chargeGrantsInvulnerability;
     entity->resetCooldownOnFreeze = stats.resetCooldownOnFreeze;
@@ -151,6 +153,13 @@ inline void spawnDeployEffect(const CardStats& stats, float x, float y, int team
     board.addEntity(effect);
 }
 
+// A card's one-time deploy heal (Battle Healer) to allied troops already on
+// the board around the placement point, once per card.
+inline void spawnDeployHeal(const CardStats& stats, float x, float y, int team, Board& board) {
+    if (stats.spawnHealAmount <= 0) return;
+    applyAreaHeal(board, Vector2D{ x, y }, stats.auraRadius, -1, team, stats.spawnHealAmount);
+}
+
 inline void spawnMeleeSquad(const CardStats& stats, float x, float y, int team, Board& board) {
     for (const auto& offset : stats.spawnOffsets) {
         auto troop = std::make_shared<MeleeTroop>(
@@ -161,6 +170,7 @@ inline void spawnMeleeSquad(const CardStats& stats, float x, float y, int team, 
         board.addEntity(troop);
     }
     spawnDeployEffect(stats, x, y, team, board);
+    spawnDeployHeal(stats, x, y, team, board);
 }
 
 inline void spawnRangedSquad(const CardStats& stats, float x, float y, int team, Board& board) {
@@ -171,6 +181,10 @@ inline void spawnRangedSquad(const CardStats& stats, float x, float y, int team,
         if (shouldIgnoreRiver(stats)) troop->setIgnoresRiver(true);
         troop->boomerang = stats.boomerang;
         troop->boomerangReturnDelayTicks = stats.boomerangReturnDelayTicks;
+        troop->pellets = stats.pellets;
+        troop->burstPellets = stats.burstPellets;
+        troop->meleeAltRange = stats.meleeAltRange;
+        troop->meleeAltDamage = stats.meleeAltDamage;
         applyCardMetadata(troop, stats);
         board.addEntity(troop);
     }
@@ -222,6 +236,7 @@ inline void spawnSpell(const CardStats& stats, float x, float y, int team, Board
     // Set after construction for the reason configureRoll gives below: the
     // constructor is shared with call sites that have no card behind them.
     spell->crownTowerDamage = stats.spellCrownTowerDamage;
+    spell->buildingDamage = stats.spellBuildingDamage;
     spell->spawnRingRadius = stats.spellSpawnRingRadius;
     // Rolling spells (The Log, Barbarian Barrel) are configured after
     // construction: configureRoll latches the roll origin from the spawn

@@ -264,6 +264,15 @@ public:
     int attacksSinceBurst = 0;
     bool currentHitIsBurst = false;
 
+    // Attack combo (Monk: 140 / 140 / 422): attack k deals
+    // attackSequenceDamage[k % n] in place of `damage`. The counter carries
+    // across targets and is never reset. The last attack of the combo knocks
+    // its target back attackSequencePushback tiles (Monk's MeleePushback3;
+    // buildings are never moved). Empty disables it.
+    std::vector<int> attackSequenceDamage;
+    int attackSequenceIndex = 0;
+    float attackSequencePushback = 0.0f;
+
     // Fired when this entity actually takes damage; the receiving-end
     // counterpart of onHitEffects.
     std::shared_ptr<IOnDamageTakenEffect> onDamageTakenEffect;
@@ -785,6 +794,14 @@ public:
                             performAttack(board, t);
                         }
                     }
+                    if (!attackSequenceDamage.empty()) {
+                        const int n = static_cast<int>(attackSequenceDamage.size());
+                        if (attackSequenceIndex == n - 1 && attackSequencePushback > 0.0f && target->isAlive()) {
+                            pushAway(*target, position, attackSequencePushback);
+                            target->clampPosition(board);
+                        }
+                        attackSequenceIndex = (attackSequenceIndex + 1) % n;
+                    }
                     currentCooldown = static_cast<float>(attackCooldown);
                     if (chargeThreshold > 0.0f) {
                         if (chargeIsSticky && chargeProgress >= chargeThreshold) chargeHasStuck = true;
@@ -1068,7 +1085,7 @@ public:
 protected:
 
     int getCurrentDamage() const {
-        int base = damage;
+        int base = attackSequenceDamage.empty() ? damage : attackSequenceDamage[attackSequenceIndex];
         if (rampFullTick > 0) {
             float fraction = (rampStage4Tick > 0 && ticksOnTarget >= rampStage4Tick) ? rampStage4Fraction
                 : (ticksOnTarget >= rampFullTick) ? 1.0f
@@ -1219,15 +1236,19 @@ inline std::vector<std::shared_ptr<CombatEntity>> applyAreaBuff(Board& board, co
     return candidates;
 }
 
-// Heal every same-team entity within radius by `amount` (Battle Healer),
-// excluding the source. There is no generic max hp to cap against, so it can
-// overheal. No-op for radius or amount <= 0.
+// Heal every same-team troop within radius by `amount` (Battle Healer),
+// excluding the source. Buildings and towers are not healed (the client's
+// friendly_troop_no_buildings filter), and neither is a healer
+// (healAllyAmount > 0): a Battle Healer ignores Battle Healer heals (its
+// IgnoreBuff), its own and another's. There is no generic max hp to cap
+// against, so it can overheal. No-op for radius or amount <= 0.
 inline void applyAreaHeal(Board& board, const Vector2D& origin, float radius, int excludeId,
         int team, int amount) {
     if (radius <= 0.0f || amount <= 0) return;
     for (const auto& entity : board.getEntities()) {
         if (entity->id == excludeId) continue;
-        if (entity->team != team || !entity->isAlive()) continue;
+        if (entity->team != team || !entity->isAlive() || entity->isBuilding()) continue;
+        if (auto ce = dynamic_cast<const CombatEntity*>(entity.get()); ce && ce->healAllyAmount > 0) continue;
         if (origin.distanceTo(entity->position) > radius) continue;
         entity->hp += amount;
     }

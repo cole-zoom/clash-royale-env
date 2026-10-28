@@ -103,6 +103,17 @@ struct CardDefinition {
 // definition.
 inline constexpr int CARD_ID_COUNT = 185;
 
+// A client projectile speed (the same tiles-per-minute unit as a troop's Speed)
+// in engine tiles per tick, through the troop conversion: HunterProjectile and
+// FirecrackerExplosion both fly at 550, 1.215 tiles a tick.
+inline constexpr float clientProjectileSpeed(float clientSpeed) {
+    return clientSpeed * REAL_TILES_PER_MIN_TO_ENGINE * MOVEMENT_SPEED_SCALE;
+}
+// Hunter: 10 pellets, 20-degree fan, 6.5 tiles, radius 0.3, stop on first hit.
+inline constexpr PelletSpread HUNTER_PELLETS{ 10, 20.0f, 6.5f, 0.3f, clientProjectileSpeed(550.0f), false };
+// Firecracker: 5 sparks, 30-degree fan, 5 tiles past the burst, radius 0.4, piercing.
+inline constexpr PelletSpread FIRECRACKER_SPARKS{ 5, 30.0f, 5.0f, 0.4f, clientProjectileSpeed(550.0f), true };
+
 class CardRegistry {
 private:
     std::unordered_map<int, CardDefinition> cards;
@@ -743,13 +754,19 @@ private:
             .withSpawnEffect(1.3f, 430)
             .withJump(3.5f, 5.0f, 2.0f, 2.2f)
             .withIgnoresRiver());
-        // The real heal is 4 pulses of 25.5 (102) per attack cycle, applied
-        // here as one 102 heal per landed hit. The larger deploy heal (202) is
-        // not modelled (spawn effects only damage). Battle Healer jumps the
+        // Heals: every attack, allied troops within 3 tiles for 102 (client
+        // BattleHealerAll, 40/s for 1 s = 102 at level 11, there 4 pulses,
+        // here one heal per landed hit); on deploy, the same radius for 202
+        // (BattleHealerSpawnBuff, 79/s for 1 s; there over the first second,
+        // here at once). Troops only, never buildings, and never a Battle
+        // Healer: it ignores Battle Healer heals, its own and another's
+        // (IgnoreBuff). No self-heal: the client's BuffWhenNotAttackingTime is
+        // not modelled, as Cole ruled (2026-10-28). Battle Healer jumps the
         // river.
-        // client battle_healer.toml Hitpoints 750 -> 1920, Damage 105 -> 269, HitSpeed 2.0 s, Range 1.6 (was 1717, 148, 1.5 s, 1.2) (2026-10-28)
-        add(troop(49, "Battle Healer", 4.0f, Archetype::MeleeSquad, 1920, SPEED_MEDIUM, 1.6f, 269, 20, 'f')
+        // client battle_healer.toml Hitpoints 750 -> 1920, Damage 105 -> 268, HitSpeed 2.0 s, Range 1.6 (was 1717, 148, 1.5 s, 1.2) (2026-10-28)
+        add(troop(49, "Battle Healer", 4.0f, Archetype::MeleeSquad, 1920, SPEED_MEDIUM, 1.6f, 268, 20, 'f')
             .withHealAura(3.0f, 102)
+            .withSpawnHeal(202)
             .withIgnoresRiver());
         // Bandit crosses the river only by dashing; with no separate dash
         // state, she always ignores it.
@@ -816,23 +833,24 @@ private:
         add(troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
             .withTargetsAir()
             .withSplash(2.5f).withSightRange(9.5f).withDeployTime(12));
-        // Hunter: the real card fires 10 randomly spread pellets and no falloff
-        // curve is published. withRangeFalloff is an invented deterministic
-        // approximation: linear from full damage point-blank to half at max
-        // range.
+        // Hunter: 10 pellets of 84 a shot (client hunter.toml MultipleProjectiles 10, HunterProjectile Damage 33
+        // -> 84), each its own projectile gone on its first collision (CheckCollisions, ProjectileRadius 0.3),
+        // flying up to 6.5 tiles (ProjectileRange) in a 20-degree fan. Point-blank on a big target: 840.
         add(troop(62, "Hunter", 4.0f, Archetype::RangedSquad, 885, SPEED_MEDIUM, 4.0f, 84, 22, '!')
             .withTargetsAir()
-            .withSplash(1.5f)
-            .withRangeFalloff(0.5f));
+            .withPellets(HUNTER_PELLETS));
         // A piercing line: 11.0 long, half-width 0.25.
         // client elitearcher.toml projectile Damage -> 136 (was 143) (2026-10-28)
         add(troop(63, "Magic Archer", 4.0f, Archetype::RangedSquad, 529, SPEED_MEDIUM, 7.0f, 136, 11, '#')
             .withTargetsAir()
             .withSplash(0.25f).withLineSplash(11.0f).withSightRange(7.5f));
         // client firecracker.toml SightRange 8.0 (was 8.5) (2026-10-28)
+        // The shell bursts at the target into 5 sparks of 64 (FirecrackerExplosion SpawnCount 5, Damage 25 -> 64),
+        // each piercing (radius 0.4) and flying on 5 tiles (ProjectileRange) in a 30-degree fan along the shot's
+        // line, so a unit behind the target is hit too. Was one 64 hit in 1.5 splash (2026-10-28).
         add(troop(64, "Firecracker", 3.0f, Archetype::RangedSquad, 304, SPEED_FAST, 6.0f, 64, 30, '$')
             .withTargetsAir()
-            .withSplash(1.5f)
+            .withBurstPellets(FIRECRACKER_SPARKS)
             .withRecoil(1.0f).withSightRange(8.0f)); // kicks back 1 tile after every attack
         add(troop(65, "Skeleton Dragons", 4.0f, Archetype::RangedSquad, 560, SPEED_FAST, 3.5f, 151, 20, '%')
             .withOffsets({ {-0.4f, 0.0f}, {0.4f, 0.0f} }).withFlying().withTargetsAir()
@@ -922,11 +940,13 @@ private:
             .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f} })
             .withTargetsAir()
             .withOnHit(std::make_shared<FreezeOnHit>(3, 0.0f)).withSightRange(5.0f));
-        // withSightRange(6.0f), like the single Musketeer (id 6): three of her,
-        // with attackRange 6.0.
-        add(troop(80, "Three Musketeers", 9.0f, Archetype::RangedSquad, 722, SPEED_MEDIUM, 6.0f, 218, 10, ']')
+        // Three Elite Musketeers (client three_musketeer_rework.toml, 2026-10-28): 906 hp each (354), a 204 shot
+        // (Damage 80) at range 6 or, against a ground target within 1.6, a 314 bayonet (BaseDamage 123), one or
+        // the other per attack; air always gets the shot. 1.3 s. Was 722 hp, 218, 1.0 s.
+        add(troop(80, "Three Musketeers", 9.0f, Archetype::RangedSquad, 906, SPEED_MEDIUM, 6.0f, 204, 13, ']')
             .withOffsets({ {-2.0f, 0.0f}, {0.0f, 0.0f}, {2.0f, 0.0f} })
-            .withTargetsAir().withSightRange(6.0f));
+            .withTargetsAir().withSightRange(6.0f)
+            .withGroundMeleeAttack(1.6f, 314));
 
         // === Building targeters (expansion) ===
         // Battle Ram: breaks on its first hit on a building and releases its
@@ -1074,9 +1094,12 @@ private:
         // the -15% movement slow, as Poison's (was 43, full to towers, no slow) (2026-10-28)
         add(spell(102, "Goblin Curse", 2.0f, 3.0f, 36, 8, '$').withRepeats(6, 10)
             .withSpellOnHit(std::make_shared<MoveSlowOnHit>(10, 0.85f)));
-        // Earthquake: ground-only damage over time with the 50% movement slow.
-        // The real 3.5x damage against buildings is not modelled.
-        add(spell(103, "Earthquake", 3.0f, 3.5f, 82, 8, '%').withRepeats(3, 10).withGroundOnly()
+        // Earthquake: ground-only damage over time with the 50% movement slow. client earthquake.toml
+        // DamagePerSecond 32 -> 81 a second for 3 s to troops; BuildingDamagePercent 350 -> 286 to other buildings;
+        // CrownTowerDamagePercent -40 -> 49 to Crown Towers (147 in all), with no other reduction on top. Was 82 to
+        // everything (2026-10-28).
+        add(spell(103, "Earthquake", 3.0f, 3.5f, 81, 8, '%').withRepeats(3, 10).withGroundOnly()
+            .withCrownTowerDamage(49).withBuildingDamage(286)
             .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.5f)));
         // Void: three damage tiers (340 per hit on 1 target, 160 on 2-4, 76 on
         // 5+), once per wave.
@@ -1178,10 +1201,12 @@ private:
             .withTargetsAir()
             .withChampionAbility(1.0f, 170, std::make_shared<ArcherQueenCloakEffect>(35, 1.0f / 2.8f)));
 
-        // Monk: his 3-hit combo is flat damage here. "Pensive Protection" (65%
-        // damage reduction for 4 s): see MonkDeflectEffect.
+        // Monk: a 3-hit combo, 140 / 140 / 422 (client monk.toml Damage 55, VariableDamage2 55, VariableDamage3
+        // 165), every 0.8 s, the count carrying across targets; the third hit knocks back 1.8 tiles
+        // (MeleePushback3). "Pensive Protection" (65% damage reduction for 4 s): see MonkDeflectEffect.
         // client spells_characters.csv ManaCost 5 (was 4) (2026-10-28)
         add(troop(119, "Monk", 5.0f, Archetype::MeleeSquad, 2214, SPEED_MEDIUM, 1.2f, 140, 8, 'M')
+            .withAttackSequence({ 140, 140, 422 }, 1.8f)
             .withChampionAbility(1.0f, 170, std::make_shared<MonkDeflectEffect>(0.35f, 40)));
 
         // Little Prince: hit speed ramps 1.2 s -> 0.8 s -> 0.4 s on one target
@@ -1486,9 +1511,9 @@ private:
         // s net + 5 s recharge), via PeriodicFreezeNearestEffect.
         addEvolution(146,
             troop(62, "Hunter", 4.0f, Archetype::RangedSquad, 885, SPEED_MEDIUM, 4.0f, 84, 22, '!')
-                .withTargetsAir().withSplash(1.5f).withRangeFalloff(0.5f),
+                .withTargetsAir().withPellets(HUNTER_PELLETS),
             troop(62, "Hunter", 4.0f, Archetype::RangedSquad, 885, SPEED_MEDIUM, 4.0f, 84, 22, '!')
-                .withTargetsAir().withSplash(1.5f).withRangeFalloff(0.5f)
+                .withTargetsAir().withPellets(HUNTER_PELLETS)
                 .withPeriodicEffect(80, std::make_shared<PeriodicFreezeNearestEffect>(4.0f, 30)),
             2, 1);
 

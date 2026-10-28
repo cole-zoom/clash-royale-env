@@ -5,6 +5,7 @@
 #include "DeathEffect.h"
 #include "PeriodicEffect.h"
 #include "AbilityEffect.h"
+#include "PelletSpread.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -109,6 +110,10 @@ struct CardStats {
     // publishes this per spell (perception/UPSTREAM_REQUESTS.md item 29); only
     // Poison sets it so far (item 32).
     int spellCrownTowerDamage = -1;
+    // Damage ONE application deals to any other building (Earthquake's 350%).
+    // -1, the default, keeps the troop damage. Crown Towers take
+    // spellCrownTowerDamage, never this.
+    int spellBuildingDamage = -1;
 
     // Castable on the caster's own side only, as a troop is (Barbarian Barrel).
     // The Log's river allowance is the rolling-spell default; this narrows it.
@@ -231,6 +236,22 @@ struct CardStats {
     float auraBuffMultiplier = 1.0f;
     int auraBuffDurationTicks = 0;
     int healAllyAmount = 0;
+    // A one-time heal on deploy to allied troops within auraRadius (Battle
+    // Healer); same eligibility as the per-attack heal (applyAreaHeal).
+    int spawnHealAmount = 0;
+
+    // Ranged-squad attack variants (RangedTroop): a fan of colliding pellets
+    // instead of one homing shot (Hunter), a shell that bursts into a fan of
+    // sparks (Firecracker), and a melee alternative against ground targets in
+    // reach (Three Musketeers' bayonet). See RangedTroop.
+    PelletSpread pellets;
+    PelletSpread burstPellets;
+    float meleeAltRange = 0.0f;
+    int meleeAltDamage = 0;
+
+    // Attack combo (Monk); see CombatEntity::attackSequenceDamage.
+    std::vector<int> attackSequenceDamage;
+    float attackSequencePushback = 0.0f;
 
     // Dash invulnerability (Bandit).
     bool chargeGrantsInvulnerability = false;
@@ -477,6 +498,32 @@ struct CardStats {
     CardStats& withHealAura(float radius, int amount) {
         auraRadius = radius; // shared with the buff aura; a card uses one or the other
         healAllyAmount = amount;
+        return *this;
+    }
+    CardStats& withSpawnHeal(int amount) {
+        spawnHealAmount = amount;
+        return *this;
+    }
+    CardStats& withPellets(PelletSpread spread) {
+        pellets = spread;
+        return *this;
+    }
+    CardStats& withBurstPellets(PelletSpread spread) {
+        burstPellets = spread;
+        return *this;
+    }
+    CardStats& withGroundMeleeAttack(float range, int damage) {
+        meleeAltRange = range;
+        meleeAltDamage = damage;
+        return *this;
+    }
+    CardStats& withAttackSequence(std::vector<int> damages, float lastHitPushback = 0.0f) {
+        attackSequenceDamage = std::move(damages);
+        attackSequencePushback = lastHitPushback;
+        return *this;
+    }
+    CardStats& withBuildingDamage(int perApplication) {
+        spellBuildingDamage = perApplication;
         return *this;
     }
     CardStats& withRepeats(int count, int intervalTicks) {
