@@ -21,6 +21,7 @@
 #include "AreaStunEffect.h"
 #include "ElixirGrantEffect.h"
 #include "EnemyElixirGrantOnDeath.h"
+#include "OwnElixirGrantOnDeath.h"
 #include "SpawnOnDeathForEnemyTeam.h"
 #include "ProximityGatedPeriodicSpawnEffect.h"
 #include "CursedHogOnHit.h"
@@ -654,7 +655,8 @@ private:
 
         // === Defensive structures ===
         add(building(25, "Cannon", 3.0f, 824, 'C', 5.5f, 202, 10));
-        add(building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir());
+        add(building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir()
+            .withLifetime(250)); // client tesla LifeTime 25 s (was 30) (2026-10-28)
         // withSightRange(6.0f) is not redundant with the 5.5 default: with
         // attackRange 6.0, the default would let it attack what it cannot see.
         // Pinned by test_sight_range.cpp.
@@ -674,7 +676,7 @@ private:
         // the fully ramped max; getCurrentDamage() scales it.
         add(building(28, "Inferno Tower", 5.0f, 1748, 'I', 6.0f, 847, 4)
             .withTargetsAir()
-            .withDamageRamp(20, 40, 0.05f, 0.1875f).withSightRange(6.0f));
+            .withDamageRamp(20, 40, 44.0f / 847.0f, 0.1875f).withSightRange(6.0f)); // client 17 / 62 / 331 -> 44 / 159 / 847, 2 s each (first was 0.05 = 42) (2026-10-28)
 
         // === Spells ===
         // Arrows: 3 volleys of 123, not one 369 hit.
@@ -778,11 +780,12 @@ private:
             .withSecondaryUnit(goblinMachineTurretStats())); // independently targeting rocket turret
 
         // Inferno Dragon and Electro Dragon: instant zaps, so MeleeSquad as
-        // with Electro Wizard. Inferno Dragon ramps 35 -> 120 -> 422 every 1.5
-        // s on one target; `damage` is the ramped max.
-        add(troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 5.0f, 422, 4, '4')
+        // with Electro Wizard. Inferno Dragon ramps 36 -> 120 -> 422 every 2 s
+        // on one target (client infernodragon.toml Damage 14 / VariableDamage2 47 / 3 165,
+        // VariableDamageTime 2000 each, Range 3.5; was every 1.5 s, range 5.0) (2026-10-28); `damage` is the ramped max.
+        add(troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 3.5f, 422, 4, '4')
             .withFlying().withTargetsAir()
-            .withDamageRamp(15, 30, 0.083f, 0.284f));
+            .withDamageRamp(20, 40, 36.0f / 422.0f, 120.0f / 422.0f));
         // A true chain, not splash: up to 3 distinct targets (hops up to 4
         // tiles), each taking the full 192.
         add(troop(57, "Electro Dragon", 5.0f, Archetype::MeleeSquad, 1049, SPEED_MEDIUM, 3.5f, 192, 21, '5')
@@ -808,9 +811,11 @@ private:
             .withSplash(1.8f)
             .withStunResetsCooldown() // a stun restarts her charge
             .withSightRange(5.0f));
+        // client princess.toml DeployTime 1.2 s (was 1.0) (2026-10-28). Her volley is 5 arrows (MultipleProjectiles) of 169
+        // landing spread; modelled as one 168 hit splashing 2.5 (her AreaDamageRadius).
         add(troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
             .withTargetsAir()
-            .withSplash(2.5f).withSightRange(9.5f));
+            .withSplash(2.5f).withSightRange(9.5f).withDeployTime(12));
         // Hunter: the real card fires 10 randomly spread pellets and no falloff
         // curve is published. withRangeFalloff is an invented deterministic
         // approximation: linear from full damage point-blank to half at max
@@ -1013,7 +1018,7 @@ private:
         // spawning via PeriodicSpawnEffect. Barbarian Hut: 3 every 15 s, plus
         // one Barbarian on its death.
         add(building(94, "Barbarian Hut", 6.0f, 1164, '2', 0.0f, 0, 100)
-            .withPeriodicEffect(150, std::make_shared<PeriodicSpawnEffect>(barbarianHutBarbarianStats()))
+            .withPeriodicEffect(140, std::make_shared<PeriodicSpawnEffect>(barbarianHutBarbarianStats())) // client SpawnPauseTime 14 s (was 15) (2026-10-28)
             .withDeathEffect(std::make_shared<SpawnOnDeath>(barbarianHutDeathBarbarianStats())));
         // Goblin Hut spawns only while an enemy is within 6 tiles, every 2.2 s
         // (ProximityGatedPeriodicSpawnEffect), and releases one Spear Goblin on
@@ -1028,20 +1033,25 @@ private:
             .withDeathEffect(std::make_shared<SpawnOnDeath>(witchSkeletonStats())));
         // Goblin Cage: its whole function is releasing a Goblin Brawler on
         // death.
-        add(building(97, "Goblin Cage", 4.0f, 780, '6', 0.0f, 0, 100)
+        // client goblincage.toml LifeTime 20 s (was 30) (2026-10-28)
+        add(building(97, "Goblin Cage", 4.0f, 780, '6', 0.0f, 0, 100).withLifetime(200)
             .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinCageBrawlerStats())));
         // Goblin Drill: a one-time 360-degree emergence burst (the spawn
         // effect; knockback not modelled), periodic Goblins, and 2 Goblins on
         // death.
-        add(building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100)
+        // client goblindrilldig.toml BUILDING.GoblinDrill LifeTime 10 s (was 30) (2026-10-28)
+        add(building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100).withLifetime(100)
             .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats()))
             .withDeployAnywhere()
             .withSpawnEffect(2.0f, 84)
             .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats())));
-        // Elixir Collector: no attack; periodically credits elixir
-        // (ElixirGrantEffect). Interval and amount are not sourced.
+        // Elixir Collector: no attack; credits elixir (ElixirGrantEffect). client elixircollector.toml: 1 every
+        // 15 s (ManaGenerateTimeMs), LifeTime 110 s, 1 more when it dies (ManaOnDeath) -- 8 in a full life (was 1
+        // every 8 s for 30 s, nothing on death: 3) (2026-10-28).
         add(building(99, "Elixir Collector", 6.0f, 1070, '9', 0.0f, 0, 100)
-            .withPeriodicEffect(80, std::make_shared<ElixirGrantEffect>(1.0f)));
+            .withPeriodicEffect(150, std::make_shared<ElixirGrantEffect>(1.0f))
+            .withLifetime(1100)
+            .withDeathEffect(std::make_shared<OwnElixirGrantOnDeath>(1.0f)));
 
         // === Spells (expansion) ===
         // client SnowballSpell: IceWizardSlowDown (-30%) for BuffTime 3.0 s, Pushback 1800 (was 1.5 s at -50%, 1.0) (2026-10-28)
@@ -1142,7 +1152,7 @@ private:
         // knockback. The bomb radius (2.5) is not sourced. See
         // MightyMinerEscapeEffect.
         add(troop(115, "Mighty Miner", 4.0f, Archetype::MeleeSquad, 2250, SPEED_MEDIUM, 1.6f, 409, 4, '\'')
-            .withDamageRamp(20, 40, 40.0f / 409.0f, 204.0f / 409.0f)
+            .withDamageRamp(20, 40, 44.0f / 409.0f, 205.0f / 409.0f) // client 17 / 80 / 160 -> 44 / 205 / 410 (was 40 / 204) (2026-10-28)
             .withChampionAbility(1.0f, 130, std::make_shared<MightyMinerEscapeEffect>(2.5f, 332, 10, 1.8f)));
 
         // Golden Knight's "Dashing Dash": up to 10 dashes to the nearest enemy
@@ -1399,9 +1409,9 @@ private:
         // Goblin Cage: the real pull-and-hold is a hook plus a damage-over-time
         // mark; there is no hold mechanism.
         addEvolution(139,
-            building(97, "Goblin Cage", 4.0f, 780, '6', 0.0f, 0, 100)
+            building(97, "Goblin Cage", 4.0f, 780, '6', 0.0f, 0, 100).withLifetime(200)
                 .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinCageBrawlerStats())),
-            building(97, "Goblin Cage", 4.0f, 780, '6', 3.0f, 40, 20)
+            building(97, "Goblin Cage", 4.0f, 780, '6', 3.0f, 40, 20).withLifetime(200)
                 .withHook(3.0f)
                 .withOnHit(std::make_shared<PoisonOnHit>(30, 40, 10))
                 .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinCageBrawlerStats())),
@@ -1466,9 +1476,9 @@ private:
         // lingering slow zone on death is not modelled.
         addEvolution(145,
             troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
-                .withTargetsAir().withSplash(2.5f).withSightRange(9.5f),
+                .withTargetsAir().withSplash(2.5f).withSightRange(9.5f).withDeployTime(12),
             troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
-                .withTargetsAir().withSplash(2.5f).withSightRange(9.5f)
+                .withTargetsAir().withSplash(2.5f).withSightRange(9.5f).withDeployTime(12)
                 .withOnHit(std::make_shared<FreezeOnHit>(70, 0.7f)),
             2, 1);
 
@@ -1556,12 +1566,12 @@ private:
         // Goblin Drill: the real resurfacing at 66% / 33% hp (leaving a Goblin
         // each time) is approximated as more Goblins on death.
         addEvolution(153,
-            building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100)
+            building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100).withLifetime(100)
                 .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats()))
                 .withDeployAnywhere()
                 .withSpawnEffect(2.0f, 84)
                 .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats())),
-            building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100)
+            building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100).withLifetime(100)
                 .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats()))
                 .withDeployAnywhere()
                 .withSpawnEffect(2.0f, 84)
@@ -1572,8 +1582,8 @@ private:
         // Tesla ("Electro Pulse"): 6-tile radius, low damage and a 0.5 s stun.
         // There is no hiding to emerge from here, so it fires once on deploy.
         addEvolution(154,
-            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir(),
-            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir()
+            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir().withLifetime(250),
+            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir().withLifetime(250)
                 .withSpawnEffect(6.0f, 100, std::make_shared<FreezeOnHit>(5, 0.0f)),
             2, 1);
 
@@ -1683,12 +1693,12 @@ private:
         // stage after 20 s of continuous attacking deals double the max. The
         // sources disagree (49 ticks vs 20 s); the seconds figure is used.
         addEvolution(163,
-            troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 5.0f, 422, 4, '4')
+            troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 3.5f, 422, 4, '4')
                 .withFlying().withTargetsAir()
-                .withDamageRamp(15, 30, 0.083f, 0.284f),
-            troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 5.0f, 422, 4, '4')
+                .withDamageRamp(20, 40, 36.0f / 422.0f, 120.0f / 422.0f),
+            troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 3.5f, 422, 4, '4')
                 .withFlying().withTargetsAir()
-                .withDamageRamp(15, 30, 0.083f, 0.284f)
+                .withDamageRamp(20, 40, 36.0f / 422.0f, 120.0f / 422.0f)
                 .withRampStage4(200, 2.0f)
                 .withRampGracePeriod(90),
             2, 1);

@@ -146,8 +146,9 @@ TEST_CASE("Inferno Dragon Evolution's evolved spawn carries the ramp grace perio
     REQUIRE(evolvedDragon->rampStage4Tick == 200); // 20s
     REQUIRE(evolvedDragon->rampStage4Fraction == Catch::Approx(2.0f));
     // The base 3-stage ramp is unchanged; only the charge-up behaviour differs.
-    REQUIRE(evolvedDragon->rampMidTick == 15);
-    REQUIRE(evolvedDragon->rampFullTick == 30);
+    // client infernodragon.toml VariableDamageTime1 / 2: 2 s each (2026-10-28; was 1.5 s)
+    REQUIRE(evolvedDragon->rampMidTick == 20);
+    REQUIRE(evolvedDragon->rampFullTick == 40);
 }
 
 TEST_CASE("Minion Horde Evolution's Dark Guard turns a member untargetable after it takes damage",

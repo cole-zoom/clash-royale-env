@@ -502,8 +502,8 @@ TEST_CASE("Inferno Tower's damage ramps up the longer it stays locked onto the s
     REQUIRE(tower != nullptr);
 
     advancePastDeploy(tower, board);
-    tower->update(board); // ticksOnTarget == 0 on first lock: stage 1 (5% of 847)
-    REQUIRE(enemy->hp == 1000000 - 42);
+    tower->update(board); // ticksOnTarget == 0 on first lock: stage 1
+    REQUIRE(enemy->hp == 1000000 - 44); // client infernotower.toml Damage 17 -> 44 (2026-10-28; was 5% = 42)
 
     for (int i = 0; i < 39; ++i) tower->update(board); // advance to just before ticksOnTarget == 40
     int hpBefore = enemy->hp;
@@ -1050,8 +1050,8 @@ TEST_CASE("Inferno Dragon's beam damage ramps up like Inferno Tower's, while fly
     REQUIRE(dragon->targetsAir);
 
     advancePastDeploy(dragon, board);
-    dragon->update(board); // ticksOnTarget == 0 on first lock: stage 1 (~8.3% of 422)
-    REQUIRE(enemy->hp == 1000000 - 35);
+    dragon->update(board); // ticksOnTarget == 0 on first lock: stage 1
+    REQUIRE(enemy->hp == 1000000 - 36); // client infernodragon.toml Damage 14 -> 36 (2026-10-28; was 35)
 }
 
 TEST_CASE("Elixir Collector and the other spawner buildings deal no damage (spawn mechanics not modeled)", "[card_registry][data]") {

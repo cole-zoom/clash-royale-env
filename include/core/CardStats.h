@@ -246,6 +246,9 @@ struct CardStats {
     // Deploy delay before the first attack (X-Bow); see
     // CombatEntity::seedCooldown.
     int initialCooldownTicks = 0;
+    // A building's life before it expires (Building::lifetimeTicks). 30 s is the client's for most; the
+    // others set their own LifeTime (Tesla 25 s, Goblin Cage 20 s, Elixir Collector 110 s, Goblin Drill 10 s).
+    int lifetimeTicks = 300;
     // HP-threshold transform (Cannon Cart).
     float transformAtHpFraction = 0.0f;
     int transformLifetimeTicks = 0;
@@ -535,6 +538,10 @@ struct CardStats {
     }
     CardStats& withSightRange(float range) {
         sightRange = range;
+        return *this;
+    }
+    CardStats& withLifetime(int ticks) {
+        lifetimeTicks = ticks;
         return *this;
     }
     CardStats& withDeployDelay(int ticks) {

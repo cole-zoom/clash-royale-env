@@ -155,10 +155,11 @@ TEST_CASE("Elixir Collector passively grants its owner extra elixir beyond norma
     REQUIRE(game.playCard(0, 99, 9.0f, 10.0f));
 
     game.playerAI.elixir = 0.0f; // reset low so the cap doesn't mask the effect
-    // 80 ticks of interval plus the 10-tick deploy time before its first cycle.
-    for (int i = 0; i < 80 + DEPLOY_TIME_TICKS; ++i) game.step();
+    // 150 ticks of interval (client ManaGenerateTimeMs 15 s, 2026-10-28; was 80) plus the 10-tick deploy time
+    // before its first cycle.
+    for (int i = 0; i < 150 + DEPLOY_TIME_TICKS; ++i) game.step();
 
-    float pureRegenOnly = 0.035f * (80 + DEPLOY_TIME_TICKS); // regen alone, same window
+    float pureRegenOnly = 0.035f * (150 + DEPLOY_TIME_TICKS); // regen alone, same window
     REQUIRE(game.getElixirAI() > pureRegenOnly + 0.5f); // meaningfully more than regen alone
 }
 

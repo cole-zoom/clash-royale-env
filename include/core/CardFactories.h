@@ -205,7 +205,7 @@ inline void spawnRangedBuildingTargeter(const CardStats& stats, float x, float y
 inline void spawnDefensiveBuilding(const CardStats& stats, float x, float y, int team, Board& board) {
     auto building = std::make_shared<Building>(
         board.allocateId(), x, y, stats.hp, team, stats.symbol,
-        stats.attackRange, stats.damage, stats.attackCooldown);
+        stats.attackRange, stats.damage, stats.attackCooldown, stats.lifetimeTicks);
     applyCardMetadata(building, stats);
     board.addEntity(building);
 }

@@ -245,6 +245,7 @@ PYBIND11_MODULE(clash_royale_env, m) {
         // building acts at max(deploy_ticks, deploy_delay_ticks) (X-Bow / Mortar 3.5 s)
         d["deploy_delay_ticks"] = s->initialCooldownTicks;
         d["die_after_first_hit"] = s->dieAfterFirstHit; // the client's Kamikaze
+        d["lifetime_ticks"] = s->lifetimeTicks;          // buildings only
         py::list offs;
         for (const auto& o : s->spawnOffsets) offs.append(py::make_tuple(o.x, o.y));
         d["spawn_offsets"] = offs;
