@@ -286,7 +286,7 @@ private:
             .withFlying().withTargetsAir();
     }
     static CardStats suspiciousBushGoblinStats() {
-        return troop(-30, "Bush Goblins", 0.0f, Archetype::MeleeSquad, 304, 0.5f, 0.8f, 256, 14, 'g')
+        return troop(-30, "Bush Goblins", 0.0f, Archetype::MeleeSquad, 338, SPEED_MEDIUM, 0.8f, 256, 14, 'g')
             .withOffsets({ {-0.4f, 0.0f}, {0.4f, 0.0f} });
     }
     static CardStats goblinCageBrawlerStats() {
@@ -899,7 +899,12 @@ private:
         add(troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.0f, 163, 18, '|')
             .withSplash(1.5f)
             .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5)));
-        add(troop(85, "Suspicious Bush", 2.0f, Archetype::MeleeBuildingTargeter, 81, 0.5f, 0.25f, 256, 14, '}')
+        // From the client's suspicious_bush.toml (2026-10-28): a kamikaze building-targeter that pops on reaching a
+        // building (Kamikaze, Damage 0, Range 1.6, HitSpeed 0.3 s), sight 7.5, Medium speed, invisible while walking
+        // (area damage still lands), two Bush Goblins on death. Was: attacked the tower for 256 every 1.4 s, slow,
+        // sight 5.5, and spells couldn't touch it (Cole).
+        add(troop(85, "Suspicious Bush", 2.0f, Archetype::MeleeBuildingTargeter, 81, SPEED_MEDIUM, 1.6f, 0, 3, '}')
+            .withSightRange(7.5f).withDieAfterFirstHit()
             .withInvisibility(5)
             .withDeathEffect(std::make_shared<SpawnOnDeath>(suspiciousBushGoblinStats())));
         add(troop(86, "Rune Giant", 4.0f, Archetype::MeleeBuildingTargeter, 2662, 0.5f, 1.2f, 153, 15, '~')

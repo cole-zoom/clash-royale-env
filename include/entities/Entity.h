@@ -53,6 +53,13 @@ public:
 
     virtual bool isTargetable() const { return true; }
 
+    // Area effects (splash, spells, death explosions, rolling spells) land on what
+    // they overlap even when it can't be targeted for being invisible: the
+    // client's AllowAreaDmgWhenInvisible (Suspicious Bush; Royal Ghost too).
+    // Projectiles and spells are still never hit (their isTargetable is false
+    // for what they are, not for being hidden).
+    virtual bool isAreaHittable() const { return isTargetable(); }
+
     // True only for Building and Tower. Lets code outside the Building chain
     // (knockback, pulls) ask without a dynamic_cast, which would need
     // Building.h and create an include cycle.

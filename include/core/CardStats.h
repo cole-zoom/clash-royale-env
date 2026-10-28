@@ -200,9 +200,9 @@ struct CardStats {
     // Hook (Fisherman).
     float hookRange = 0.0f;
 
-    // Invisibility (Royal Ghost, Suspicious Bush). Also blocks splash and spell
-    // damage while invisible, since both gate on isTargetable(); the real game
-    // still lets area effects land.
+    // Invisibility (Royal Ghost, Suspicious Bush): hides from targeting only;
+    // area effects still land (Entity::isAreaHittable, the client's
+    // AllowAreaDmgWhenInvisible).
     bool startsInvisible = false;
     int revealTicksAfterAttack = 0;
 

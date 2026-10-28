@@ -22,7 +22,7 @@ public:
 
     void apply(Board& board, const Vector2D& position, int team) const override {
         for (const auto& entity : board.getEntities()) {
-            if (entity->team == team || !entity->isAlive() || !entity->isTargetable()) continue;
+            if (entity->team == team || !entity->isAlive() || !entity->isAreaHittable()) continue;
             if (position.distanceTo(entity->position) > radius) continue;
             entity->takeDamage(damage);
             if (onHit) {

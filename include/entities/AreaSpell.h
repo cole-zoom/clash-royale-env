@@ -171,7 +171,7 @@ public:
         std::vector<std::shared_ptr<Entity>> candidates;
         for (const auto& entity : board.getEntities()) {
             bool teamMatches = alliesOnly ? (entity->team == this->team) : (entity->team != this->team);
-            if (entity->isAlive() && entity->isTargetable() && teamMatches && entity->id != this->id
+            if (entity->isAlive() && entity->isAreaHittable() && teamMatches && entity->id != this->id
                 && (!groundOnly || !entity->isFlying)
                 && position.distanceTo(entity->position) <= radius + CombatEntity::effectiveRadiusOf(*entity)) {
                 candidates.push_back(entity);
@@ -286,7 +286,7 @@ private:
         const float halfWidth = rollWidth * 0.5f;
 
         for (const auto& entity : board.getEntities()) {
-            if (!entity->isAlive() || !entity->isTargetable()) continue;
+            if (!entity->isAlive() || !entity->isAreaHittable()) continue;
             if (entity->team == this->team || entity->id == this->id) continue;
             if (groundOnly && entity->isFlying) continue;
             if (alreadySwept(entity->id)) continue;

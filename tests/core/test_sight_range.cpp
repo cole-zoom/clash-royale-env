@@ -260,7 +260,7 @@ const SightRow SIGHT_CATALOG[] = {
         {  82, "Royal Hogs", 9.5f },
         {  83, "Wall Breakers", 7.0f },
         {  84, "Electro Giant", 5.5f },
-        {  85, "Suspicious Bush", 5.5f },
+        {  85, "Suspicious Bush", 7.5f },   // client suspicious_bush.toml SightRange 7500 (2026-10-28)
         {  86, "Rune Giant", 5.5f },
         {  87, "Ram Rider", 7.5f },
         {  88, "Goblin Giant", 7.5f },
