@@ -241,6 +241,10 @@ PYBIND11_MODULE(clash_royale_env, m) {
         d["bodies"] = static_cast<int>(s->spawnOffsets.size()); d["splash_radius"] = s->splashRadius;
         d["spell_radius"] = s->spellRadius; d["spell_crown_tower_damage"] = s->spellCrownTowerDamage;
         d["spell_hits"] = s->spellRemainingHits;
+        // withDeployDelay: the first attack waits this long (it ticks during deploy), so a
+        // building acts at max(deploy_ticks, deploy_delay_ticks) (X-Bow / Mortar 3.5 s)
+        d["deploy_delay_ticks"] = s->initialCooldownTicks;
+        d["die_after_first_hit"] = s->dieAfterFirstHit; // the client's Kamikaze
         py::list offs;
         for (const auto& o : s->spawnOffsets) offs.append(py::make_tuple(o.x, o.y));
         d["spawn_offsets"] = offs;

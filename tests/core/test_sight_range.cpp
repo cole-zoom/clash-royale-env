@@ -199,10 +199,10 @@ const SightRow SIGHT_CATALOG[] = {
         {  13, "P.E.K.K.A.", 5.0f },
         {  14, "Prince", 5.5f },
         {  15, "Hog Rider", 9.5f },
-        {  17, "Elite Barbarians", 5.5f },
+        {  17, "Elite Barbarians", 6.0f },  // client angrybarbarian.toml SightRange 6000 (2026-10-28)
         {  18, "Royal Giant", 7.5f },
         {  19, "Golem", 7.5f },          // client golem.toml SightRange 7500 (2026-10-28)
-        {  20, "Dart Goblin", 7.5f },
+        {  20, "Dart Goblin", 7.0f },       // client blowdartgoblin.toml SightRange 7000 (2026-10-28)
         {  21, "Lumberjack", 5.5f },
         {  22, "Bowler", 5.5f },         // client bowler.toml SightRange 5500 (2026-10-28)
         {  23, "Spear Goblins", 5.5f },
@@ -239,13 +239,13 @@ const SightRow SIGHT_CATALOG[] = {
         {  61, "Princess", 9.5f },
         {  62, "Hunter", 5.5f },
         {  63, "Magic Archer", 7.5f },
-        {  64, "Firecracker", 8.5f },
+        {  64, "Firecracker", 8.0f },       // client firecracker.toml SightRange 8000 (2026-10-28)
         {  65, "Skeleton Dragons", 5.5f },
         {  66, "Goblin Demolisher", 5.5f },
         {  67, "Flying Machine", 6.0f },
         {  68, "Mother Witch", 5.5f },
         {  69, "Cannon Cart", 6.0f },
-        {  70, "Furnace", 5.5f },
+        {  70, "Furnace", 6.0f },           // client furnace_rework.toml SightRange 6000 (2026-10-28)
         {  71, "Witch", 5.5f },
         {  72, "Ice Spirit", 5.5f },
         {  73, "Fire Spirit", 5.5f },
@@ -261,7 +261,7 @@ const SightRow SIGHT_CATALOG[] = {
         {  83, "Wall Breakers", 7.0f },
         {  84, "Electro Giant", 7.5f },  // client electrogiant.toml SightRange 7500 (2026-10-28)
         {  85, "Suspicious Bush", 7.5f },   // client suspicious_bush.toml SightRange 7500 (2026-10-28)
-        {  86, "Rune Giant", 5.5f },
+        {  86, "Rune Giant", 7.5f },        // client giant_buffer_v2.toml SightRange 7500 (2026-10-28)
         {  87, "Ram Rider", 7.5f },
         {  88, "Goblin Giant", 7.5f },
         {  89, "Skeleton Barrel", 7.7f },
@@ -291,14 +291,14 @@ const SightRow SIGHT_CATALOG[] = {
         { 127, "Bomber", 5.5f },
         { 128, "Archers", 5.5f },
         { 129, "Cannon", 5.5f },
-        { 130, "Firecracker", 8.5f },
-        { 131, "Dart Goblin", 7.5f },
+        { 130, "Firecracker", 8.0f },       // client firecracker.toml SightRange 8000 (2026-10-28)
+        { 131, "Dart Goblin", 7.0f },       // client blowdartgoblin.toml SightRange 7000 (2026-10-28)
         { 133, "Skeleton Army", 5.5f },
         { 134, "Skeleton Barrel", 7.7f },
         { 135, "Knight", 5.5f },
         { 136, "Royal Ghost", 5.5f },
         { 137, "Baby Dragon", 5.5f },
-        { 138, "Furnace", 5.5f },
+        { 138, "Furnace", 6.0f },           // client furnace_rework.toml SightRange 6000 (2026-10-28)
         { 139, "Goblin Cage", 5.5f },
         { 140, "Musketeer", 6.0f },
         { 141, "Wizard", 5.5f },

@@ -23,7 +23,11 @@ public:
     void apply(Board& board, const Vector2D& position, int team) const override {
         for (const auto& entity : board.getEntities()) {
             if (entity->team == team || !entity->isAlive() || !entity->isAreaHittable()) continue;
-            if (position.distanceTo(entity->position) > radius) continue;
+            // Hits what the blast overlaps (radius plus the target's own radius), as AreaSpell and the delayed
+            // bomb (DelayedAreaDamageOnDeath) already do. Centre-to-centre, a Skeleton Barrel popping at a
+            // Princess Tower (client: Range 0.35, explosion 2.0) never reached the tower's centre 2.35 away
+            // (2026-10-28).
+            if (position.distanceTo(entity->position) > radius + CombatEntity::effectiveRadiusOf(*entity)) continue;
             entity->takeDamage(damage);
             if (onHit) {
                 if (auto combatTarget = std::dynamic_pointer_cast<CombatEntity>(entity)) {
