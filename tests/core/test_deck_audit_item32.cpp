@@ -553,7 +553,7 @@ TEST_CASE("Goblin Hut is 1180 hp and its Spear Goblins shoot air, every 1.6 s",
     REQUIRE(flyer->hp < 1000000); // was untouched: the Hut's goblins could not target air
 }
 
-TEST_CASE("Every Barbarian is 716 hp, and Barbarian Barrel rolls for 232",
+TEST_CASE("Every Barbarian is 716 hp, and Barbarian Barrel rolls for 215",
           "[item32][barbarians][regression]") {
     {
         Match cardMatch;
@@ -565,8 +565,9 @@ TEST_CASE("Every Barbarian is 716 hp, and Barbarian Barrel rolls for 232",
     auto barbarian = m.stepUntil("Barbarians", 0, 40);
     REQUIRE(barbarian);
     REQUIRE(barbarian->hp == 716);
-    REQUIRE(target->hp <= 10000 - 232);
-    REQUIRE(target->hp > 10000 - 2 * 232); // one roll hit (the Barbarian may have swung too)
+    // client BarbLogProjectileRolling Damage 84 -> 215 (2026-10-28; was DeckShop's 232)
+    REQUIRE(target->hp <= 10000 - 215);
+    REQUIRE(target->hp > 10000 - 2 * 215); // one roll hit (the Barbarian may have swung too)
 }
 
 TEST_CASE("Barbarian Barrel is cast on its own side only; The Log keeps the river",

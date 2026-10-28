@@ -605,7 +605,7 @@ private:
         // client ice_wizardProjectile Radius 1.5, AoE (was single-target) (2026-10-28)
         add(troop(34, "Ice Wizard", 3.0f, Archetype::RangedSquad, 689, SPEED_MEDIUM, 5.5f, 90, 17, 'i')
             .withTargetsAir()
-            .withOnHit(std::make_shared<FreezeOnHit>(30, 0.65f)).withSplash(1.5f));
+            .withOnHit(std::make_shared<FreezeOnHit>(25, 0.7f)).withSplash(1.5f)); // client IceWizardSlowDown -30% for 2.5 s (was 3.0 s at -35%) (2026-10-28)
 
         // Executioner's axe hits on arrival and again 1.5 s later on the
         // return. The real axe pierces everything along its path both ways;
@@ -682,9 +682,14 @@ private:
         add(spell(7, "Fireball", 4.0f, 2.5f, 689, 10, 'O')
             .withKnockback(1.0f));
         add(spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z'));
+        // client RocketSpell Pushback 1800 -> 1.8 (was 1.0) (2026-10-28)
         add(spell(30, "Rocket", 6.0f, 2.0f, 1485, 15, 'r')
-            .withKnockback(1.0f));
-        add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j'));
+            .withKnockback(1.8f));
+        // client lightning.toml: three bolts, each on the biggest target not yet hit (HitBiggestTargets,
+        // OneHitPerTarget), each stunning 0.5 s (ZapFreeze). Was: every enemy in the radius, no stun (2026-10-28).
+        add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j')
+            .withSpellTopHpTargets(3)
+            .withSpellOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)));
         // Poison: 92 damage every second for 8 s; whoever stands in it takes
         // each pulse. A Crown Tower takes 21 per pulse (168 in all: official
         // June 2026 notes, fixed in game on 26 Aug), and enemy troops inside
@@ -701,7 +706,7 @@ private:
         // roll) and knockback (0.8) are not sourced.
         add(spell(33, "The Log", 2.0f, 3.9f, 269, 8, 'o')
             .withGroundOnly()
-            .withRollingSweep(10.1f, 3.9f, 1.0f, 0.8f));
+            .withRollingSweep(10.1f, 3.9f, 1.0f, 0.7f)); // client LogProjectileRolling Pushback 700 (was 0.8) (2026-10-28)
 
         // --- the 2026 roster expansion (ids 46+) ---
         // Every remaining non-Champion, non-Evolution, non-Tower-Troop card,
@@ -1039,21 +1044,26 @@ private:
             .withPeriodicEffect(80, std::make_shared<ElixirGrantEffect>(1.0f)));
 
         // === Spells (expansion) ===
+        // client SnowballSpell: IceWizardSlowDown (-30%) for BuffTime 3.0 s, Pushback 1800 (was 1.5 s at -50%, 1.0) (2026-10-28)
         add(spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
-            .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
-            .withKnockback(1.0f));
+            .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.7f))
+            .withKnockback(1.8f));
         // Barbarian Barrel: rolls 4.5 tiles at width 2.6 (published), and its
         // Barbarian spawns where the barrel stops. No knockback: the real
         // barrel does not throw what it rolls over. Cast on its own side only,
         // unlike The Log's river allowance (UPSTREAM_REQUESTS.md item 32n).
-        add(spell(101, "Barbarian Barrel", 2.0f, 2.5f, 232, 8, '#')
+        // client BarbLogProjectileRolling Damage 84 -> 215 (was DeckShop's 232) (2026-10-28)
+        add(spell(101, "Barbarian Barrel", 2.0f, 2.5f, 215, 8, '#')
             .withGroundOnly()
             .withOwnSideOnly()
             .withRollingSweep(4.5f, 2.6f, 0.5f, 0.0f)
             .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(barbarianBarrelBarbarianStats())));
         // Goblin Curse: only the damage over time is modelled, not the
         // damage-taken amplification or the Goblin on cursed death.
-        add(spell(102, "Goblin Curse", 2.0f, 3.0f, 43, 8, '$').withRepeats(6, 10));
+        // client goblin_curse.toml GoblinCurseDamage: 14/s -> 36 a second for 6 s, towers 4 -> 10 a hit, and
+        // the -15% movement slow, as Poison's (was 43, full to towers, no slow) (2026-10-28)
+        add(spell(102, "Goblin Curse", 2.0f, 3.0f, 36, 8, '$').withRepeats(6, 10)
+            .withSpellOnHit(std::make_shared<MoveSlowOnHit>(10, 0.85f)));
         // Earthquake: ground-only damage over time with the 50% movement slow.
         // The real 3.5x damage against buildings is not modelled.
         add(spell(103, "Earthquake", 3.0f, 3.5f, 82, 8, '%').withRepeats(3, 10).withGroundOnly()
@@ -1066,15 +1076,18 @@ private:
         // ground is not modelled.
         add(spell(105, "Vines", 3.0f, 2.5f, 135, 8, '+').withRepeats(3, 7)
             .withSpellTopHpTargets(3));
-        add(spell(106, "Tornado", 3.0f, 5.5f, 154, 8, '_')
+        // client tornado.toml: 60/s (-> 154) every 0.55 s for 1.05 s = two hits of 84, kept as one 168 hit so
+        // the unsourced pull below is applied once; towers -70% (was 154, full to towers) (2026-10-28)
+        add(spell(106, "Tornado", 3.0f, 5.5f, 168, 8, '_')
             .withKnockback(-1.5f)); // negative: pulls toward the centre
-        // Freeze: the source's damage field is treated as vestigial; the card
-        // is a 4 s full stun and no damage.
-        add(spell(107, "Freeze", 4.0f, 3.0f, 0, 8, '~')
-            .withSpellOnHit(std::make_shared<FreezeOnHit>(40, 0.0f)));
+        // Freeze: client freeze.toml BaseDamage 58 -> 148, TowerDamage 15 -> 38, a 3.5 s full stun (was no
+        // damage, 4 s) (2026-10-28)
+        add(spell(107, "Freeze", 4.0f, 3.0f, 148, 8, '~')
+            .withSpellOnHit(std::make_shared<FreezeOnHit>(35, 0.0f)));
         // Rage: buffs allied damage in radius. Duration and multiplier are not
         // sourced.
-        add(spell(108, "Rage", 2.0f, 3.0f, 0, 8, '(')
+        // client ragebottle.toml RageDamage: BaseDamage 70 -> 179, TowerDamage 18 -> 46 on landing (was none) (2026-10-28)
+        add(spell(108, "Rage", 2.0f, 3.0f, 179, 8, '(')
             .withSpellBuff(1.35f, 45));
         // Goblin Barrel: drops 3 Goblins; the barrel itself deals no damage.
         add(spell(109, "Goblin Barrel", 3.0f, 0.5f, 0, 8, '[')
@@ -1094,7 +1107,8 @@ private:
             .withSpellSpawnRing(3.3f)
             .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(graveyardSkeletonStats())));
         // Royal Delivery: a shielded Royal Recruit plus its own landing damage.
-        add(spell(111, "Royal Delivery", 3.0f, 2.0f, 438, 8, '^')
+        // client RoyalDeliveryProjectile Damage 150 -> 384, Radius 3.0 (was 438, 2.0) (2026-10-28)
+        add(spell(111, "Royal Delivery", 3.0f, 3.0f, 384, 8, '^')
             .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(royalDeliveryRecruitStats())));
 
         // === Compound troops ===
@@ -1605,8 +1619,8 @@ private:
         // not modelled.
         addEvolution(158,
             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
-                .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
-                .withKnockback(1.0f),
+                .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.7f))
+                .withKnockback(1.8f),
             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
                 .withSpellOnHit(std::make_shared<FreezeOnHit>(40, 0.7f))
                 .withKnockback(-4.5f),
@@ -1777,7 +1791,8 @@ private:
         // on the spell. "Rowdy Reroll" (1 elixir, one use): see
         // HeroBarbarianBarrelRerollEffect.
         {
-            CardStats heroBarbarianBarrelSpellStats = spell(174, "Hero Barbarian Barrel", 2.0f, 2.5f, 232, 8, '#')
+            // client spells_hero_form.csv BarbLog_hero: the same BarbLogProjectile, 215 (was 232) (2026-10-28)
+            CardStats heroBarbarianBarrelSpellStats = spell(174, "Hero Barbarian Barrel", 2.0f, 2.5f, 215, 8, '#')
                 .withGroundOnly()
                 .withOwnSideOnly()
                 .withRollingSweep(4.5f, 2.6f, 0.5f, 0.0f)

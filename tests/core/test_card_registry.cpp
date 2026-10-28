@@ -700,8 +700,9 @@ TEST_CASE("Ice Wizard is genuinely ranged: freeze lands with the arrow, not when
     REQUIRE(projectile != nullptr);
 
     projectile->update(board); // projectile speed 1.5 >= distance 1.0: lands this tick
-    REQUIRE(enemy->freezeTicks == 30);
-    REQUIRE(enemy->freezeSlow == Catch::Approx(0.65f));
+    // client IceWizardSlowDown: -30% for 2.5 s (2026-10-28; was 3.0 s at 0.65)
+    REQUIRE(enemy->freezeTicks == 25);
+    REQUIRE(enemy->freezeSlow == Catch::Approx(0.7f));
 }
 
 TEST_CASE("Ice Golem's slow is on its death explosion, never on its attack",
@@ -832,7 +833,7 @@ TEST_CASE("Ordinary melee troops are unaffected by the on-hit decorator (Knight)
 
 // --- 2026 roster expansion ---
 
-TEST_CASE("Freeze deals no direct damage but fully stuns everyone in radius via the new spellOnHit hook", "[card_registry][spell_on_hit]") {
+TEST_CASE("Freeze deals its landing damage and fully stuns everyone in radius via the spellOnHit hook", "[card_registry][spell_on_hit]") {
     Board board;
     auto enemy = std::make_shared<StationaryCombatant>(1, 5.0f, 6.0f, 1000, 1, 5.0f, 10, 10); // dist 1.0 from (5,5)
     spawn(board, enemy);
@@ -844,8 +845,9 @@ TEST_CASE("Freeze deals no direct damage but fully stuns everyone in radius via 
 
     while (spell->isAlive()) spell->update(board);
 
-    REQUIRE(enemy->hp == 1000); // no damage component
-    REQUIRE(enemy->freezeTicks == 40); // 4s full stun
+    // client freeze.toml (2026-10-28): BaseDamage 58 -> 148 at level 11, BuffTime 3.5 s (was no damage, 4 s)
+    REQUIRE(enemy->hp == 1000 - 148);
+    REQUIRE(enemy->freezeTicks == 35); // 3.5 s full stun
     REQUIRE(enemy->freezeSlow == Catch::Approx(0.0f));
 }
 
@@ -862,8 +864,9 @@ TEST_CASE("Giant Snowball deals damage and applies a partial slow via spellOnHit
     while (spell->isAlive()) spell->update(board);
 
     REQUIRE(enemy->hp == 821); // 1000 - 179
-    REQUIRE(enemy->freezeTicks == 15);
-    REQUIRE(enemy->freezeSlow == Catch::Approx(0.5f));
+    // client SnowballSpell: IceWizardSlowDown (-30%) for BuffTime 3.0 s (2026-10-28; was 1.5 s at 0.5)
+    REQUIRE(enemy->freezeTicks == 30);
+    REQUIRE(enemy->freezeSlow == Catch::Approx(0.7f));
 }
 
 TEST_CASE("Battle Ram releases 2 Barbarians on death, reusing the Barbarians card's own sourced stats", "[card_registry][death]") {
@@ -1245,7 +1248,7 @@ TEST_CASE("Royal Delivery deals landing damage and drops a single shielded defen
     while (spell->isAlive()) spell->update(board);
     board.commitPendingEntities();
 
-    REQUIRE(enemy->hp == 562); // 1000 - 438 landing damage
+    REQUIRE(enemy->hp == 1000 - 384); // client RoyalDeliveryProjectile Damage 150 -> 384 (2026-10-28; was 438)
 
     std::shared_ptr<Entity> defender;
     for (const auto& e : board.getEntities()) {
