@@ -107,9 +107,13 @@ TEST_CASE("the King wakes on any damage and then fights back", "[king][activatio
     king->update(board);
     REQUIRE_FALSE(king->isAwake());
 
-    // One point of damage is enough: the trigger is any damage.
+    // One point of damage is enough: the trigger is any damage. The King shoots after its activation
+    // (king_tower.toml ActionDuration 3300 ms; Fidelity::kingActivationDelay).
     king->takeDamage(1);
     king->update(board);
+    REQUIRE_FALSE(king->isAwake());
+    REQUIRE(king->isActivating());
+    for (int i = 0; i < (CLIENT_KING_ACTIVATION_MS + 50) / 100; ++i) king->update(board);
     REQUIRE(king->isAwake());
 
     const int hpBefore = enemy->hp;
@@ -131,8 +135,7 @@ TEST_CASE("the King wakes when a friendly Princess Tower is destroyed, untouched
     REQUIRE_FALSE(king->isAwake());
 
     princess->takeDamage(princess->hp);
-    game.step();
-    game.step();
+    for (int i = 0; i < 2 + (CLIENT_KING_ACTIVATION_MS + 50) / 100; ++i) game.step();  // the trigger, then the King's activation
 
     REQUIRE(king->isAwake());
     REQUIRE(king->hp == KING_HP);   // it woke without being hit
@@ -160,7 +163,7 @@ TEST_CASE("waking is permanent -- healing back to full does not re-sleep it",
     Board board;
     auto king = makeKing(board, 0);
     king->takeDamage(100);
-    king->update(board);
+    for (int i = 0; i <= (CLIENT_KING_ACTIVATION_MS + 50) / 100; ++i) king->update(board);  // the trigger, then its activation
     REQUIRE(king->isAwake());
 
     king->hp = KING_HP;             // fully healed

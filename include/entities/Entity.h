@@ -5,6 +5,7 @@
 #include <string>
 #include <typeinfo>
 #include <unordered_map>
+#include "FidelitySwitches.h"
 
 struct Vector2D {
     float x, y;
@@ -71,6 +72,20 @@ public:
 
     virtual float getCollisionRadius() const { return 0.0f; }
 
+    // The footprint placement keeps clear of (GameManager::isValidPlacement): the engine's building and tower
+    // footprints, unchanged by Fidelity::clientBodies (legal tiles are their own question, P2 #12).
+    virtual float getPlacementRadius() const { return getCollisionRadius(); }
+
+    // A troop's own body (the client's CollisionRadius in tiles, and Mass), used while Fidelity::clientBodies is on;
+    // 0 = the engine's defaults (IMPLICIT_TROOP_RADIUS, equal pushes). Set by CardFactories::applyCardMetadata.
+    float bodyRadius = 0.0f;
+    int mass = 0;
+
+    // Damage on its way to an entity, for target queueing (Fidelity::targetQueueing): a projectile in flight
+    // reports its target's id and damage; everything else -1 / 0.
+    virtual int incomingTargetId() const { return -1; }
+    virtual int incomingDamage() const { return 0; }
+
     // Footprint for target-selection distance only, never collision or attack
     // range. A Crown Tower's is larger than its body, since units close on its
     // edge (see Tower::getTargetingRadius).
@@ -125,6 +140,14 @@ public:
         (void)byOldId;
     }
 };
+
+// The radius an entity occupies for attack reach and body spacing: a building's or tower's collision radius, a
+// troop's own client radius (Fidelity::clientBodies), else IMPLICIT_TROOP_RADIUS.
+inline float bodyRadiusOf(const Entity& e) {
+    const float r = e.getCollisionRadius();
+    if (r > 0.0f) return r;
+    return (Fidelity::clientBodies && e.bodyRadius > 0.0f) ? e.bodyRadius : Entity::IMPLICIT_TROOP_RADIUS;
+}
 
 // Repositioning helpers shared by every pull and push (hooks, Tornado,
 // knockback). None clamps to the board; callers call clampPosition()

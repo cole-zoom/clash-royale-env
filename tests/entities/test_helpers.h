@@ -107,3 +107,18 @@ struct NoLoadTimes {
     NoLoadTimes() { CombatEntity::loadTimesEnabled = false; }
     ~NoLoadTimes() { CombatEntity::loadTimesEnabled = was; }
 };
+
+// One client-mechanics switch (FidelitySwitches.h) off for a test's scope: for tests of something else that pinned
+// the earlier behaviour (a splash, a deploy delay, a wake-up trigger), or that compare both.
+template <bool* Flag>
+struct SwitchOff {
+    bool was = *Flag;
+    SwitchOff() { *Flag = false; }
+    ~SwitchOff() { *Flag = was; }
+};
+using NoClientProjectiles = SwitchOff<&Fidelity::clientProjectiles>;
+using NoClientBodies = SwitchOff<&Fidelity::clientBodies>;
+using NoKingActivationDelay = SwitchOff<&Fidelity::kingActivationDelay>;
+using NoTargetQueueing = SwitchOff<&Fidelity::targetQueueing>;
+using NoAoeWithoutTarget = SwitchOff<&Fidelity::aoeLandsWithoutTarget>;
+using NoCrownTowerSightBonus = SwitchOff<&Fidelity::crownTowerSightBonus>;

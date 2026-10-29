@@ -54,6 +54,10 @@ std::shared_ptr<Entity> spawnWedgedGolem(GameManager& game) {
 // were in a player's own back corner, none near a bridge.
 TEST_CASE("a troop pinched between two buildings still makes progress",
           "[board][collision][regression][!shouldfail]") {
+    // The pocket was measured with the engine's old bodies (King radius 2.0, every troop 0.4); the client's
+    // (Fidelity::clientBodies, King 1.4) open it, but the defect itself (no global route out) remains.
+    struct Restore { bool was = Fidelity::clientBodies; ~Restore() { Fidelity::clientBodies = was; } } restore;
+    Fidelity::clientBodies = false;
     std::vector<int> deck = { 15, 6, 25, 40, 24, 72, 33, 7 };
     GameManager game(deck, deck);
     auto golem = spawnWedgedGolem(game);

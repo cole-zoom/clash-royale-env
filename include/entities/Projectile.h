@@ -147,6 +147,16 @@ private:
     // line, each dealing `damage`. count == 0 is an ordinary hit.
     PelletSpread burst;
 
+    // Where the shot is going: the target's position, followed while it lives if the shot homes, else fixed at
+    // launch (the client's Homing; Fidelity::clientProjectiles). An area shot whose target dies on the way still
+    // lands here (Fidelity::aoeLandsWithoutTarget).
+    Vector2D aimPoint;
+    bool homing = true;
+    // A ground-only shooter's splash stays on the ground (Bomb Tower).
+    bool splashHitsAir = true;
+
+    bool isAreaShot() const { return splashRadius > 0.0f || lineSplash || burst.count > 0; }
+
 public:
     Projectile(int id, float x, float y, int team, std::weak_ptr<Entity> target, float speed, int damage,
         std::vector<std::shared_ptr<IOnHitEffect>> onHitEffects = {},
@@ -156,11 +166,27 @@ public:
         : Entity(id, x, y, 1, team, '-'), target(target), speed(speed), damage(damage),
         onHitEffects(std::move(onHitEffects)), attackerId(attackerId), attackerCardId(attackerCardId),
         splashRadius(splashRadius), lineSplash(lineSplash), lineSplashRange(lineSplashRange), origin{ x, y },
-        returnsToSender(returnsToSender), returnDelayTicks(returnDelayTicks) {}
+        returnsToSender(returnsToSender), returnDelayTicks(returnDelayTicks) {
+        auto t = target.lock();
+        aimPoint = t ? t->position : Vector2D{ x, y };
+    }
+
+    // Non-homing (the client's Homing false): only an area shot flies to a fixed point; a single-target shot keeps
+    // homing (no client single-target projectile of the engine's cards lands off its target).
+    void setHoming(bool h) { homing = h || !isAreaShot(); }
+    void setSplashHitsAir(bool on) { splashHitsAir = on; }
+
+    // Target queueing (Fidelity::targetQueueing): the damage this shot still carries to its target.
+    int incomingTargetId() const override {
+        if (outboundHitLanded) return -1;
+        auto t = target.lock();
+        return (t && t->isAlive()) ? t->id : -1;
+    }
+    int incomingDamage() const override { return outboundHitLanded ? 0 : damage; }
 
     bool isTargetable() const override { return false; }
 
-    void setBurst(const PelletSpread& spread) { burst = spread; }
+    void setBurst(const PelletSpread& spread) { burst = spread; homing = homing || !isAreaShot(); }
 
     // For Board::deepCopy. The copy still points `target` at the original
     // board's entity; Board::deepCopy repairs that with
@@ -193,15 +219,20 @@ public:
 
     void update(Board& board) override {
         auto t = target.lock();
-        if (!t || !t->isAlive()) {
+        const bool alive = t && t->isAlive();
+        if (alive && homing) aimPoint = t->position;
+        // A dead target ends the shot, unless it is an area shot still on its way out
+        // (Fidelity::aoeLandsWithoutTarget; a boomerang's return is never made without its target).
+        const bool landsAnyway = Fidelity::aoeLandsWithoutTarget && isAreaShot() && !returnsToSender;
+        if (!alive && (outboundHitLanded || !landsAnyway)) {
             hp = 0;
             return;
         }
 
         if (!outboundHitLanded) {
-            float dist = position.distanceTo(t->position);
+            float dist = position.distanceTo(aimPoint);
             if (dist <= speed) {
-                position = t->position; // snap to the impact point
+                position = aimPoint; // snap to the impact point
                 if (burst.count > 0) {
                     // Along the line the shell flew; the shooter's own
                     // facing when it was fired point-blank.
@@ -210,13 +241,17 @@ public:
                     hp = 0;
                     return;
                 }
-                applyHit(board, t);
+                if (alive && homing) {
+                    applyHit(board, t);
+                } else {
+                    landArea(board, alive ? t : nullptr);
+                }
                 outboundHitLanded = true;
                 if (!returnsToSender) hp = 0; // a normal projectile is done after one hit
                 // else stay alive for the return trip
             } else {
-                float dx = t->position.x - position.x;
-                float dy = t->position.y - position.y;
+                float dx = aimPoint.x - position.x;
+                float dy = aimPoint.y - position.y;
                 position.x += (dx / dist) * speed;
                 position.y += (dy / dist) * speed;
             }
@@ -246,7 +281,29 @@ private:
             applyLineSplashDamage(board, origin, t->position, lineSplashRange, splashRadius,
                 t->id, attackerId, team, attackerCardId, damage);
         } else {
-            applySplashDamage(board, t->position, splashRadius, t->id, attackerId, team, attackerCardId, damage);
+            applySplashDamage(board, t->position, splashRadius, t->id, attackerId, team, attackerCardId, damage,
+                splashHitsAir);
+        }
+    }
+
+    // An area shot landing at aimPoint without a homing hit: its target died on the way (t null), or it does not
+    // home and lands where the target stood at launch (t alive, hit only if still inside the area). Everyone in
+    // the area takes the damage; on-hit effects reach the target if it is caught.
+    void landArea(Board& board, const std::shared_ptr<Entity>& t) {
+        if (t && t->isAreaHittable() && !onHitEffects.empty()) {
+            const bool caught = lineSplash || aimPoint.distanceTo(t->position) <= splashRadius;
+            if (caught) {
+                if (auto combatTarget = std::dynamic_pointer_cast<CombatEntity>(t)) {
+                    for (const auto& effect : onHitEffects) effect->apply(combatTarget);
+                }
+            }
+        }
+        if (lineSplash) {
+            applyLineSplashDamage(board, origin, aimPoint, lineSplashRange, splashRadius,
+                -1, attackerId, team, attackerCardId, damage);
+        } else {
+            applySplashDamage(board, aimPoint, splashRadius, -1, attackerId, team, attackerCardId, damage,
+                splashHitsAir);
         }
     }
 };

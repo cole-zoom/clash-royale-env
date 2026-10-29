@@ -102,6 +102,12 @@ private:
         // ...and no deploy second either: applyCardMetadata gives every Princess Tower the card deploy time, so
         // both stood inert for the first 1.0 s after reset() (the King, built by the other overload, did not).
         tower->deployTicksRemaining = 0;
+        // ...nor a card's body or projectile (id 0 is the Knight's): crown towers use their own client values
+        // (Tower::getCollisionRadius, towerShotSpeed).
+        tower->bodyRadius = 0.0f;
+        tower->mass = 0;
+        tower->clientShotSpeed = 0.0f;
+        tower->clientShotHoming = true;
         tower->name = towerName;
         tower->cardId = TOWER_PRINCESS_ID;
         board.addEntity(tower);
@@ -404,6 +410,19 @@ public:
         return true;
     }
 
+    // Wakes a sleeping King at once, skipping the activation delay (Fidelity::kingActivationDelay): for building a
+    // state in which the King woke earlier. False for a missing or destroyed King.
+    bool wakeKing(int team) {
+        Tower* t = findTower(team, 0);
+        if (t == nullptr || !t->isAlive()) return false;
+        t->wake();
+        return true;
+    }
+    bool isKingAwake(int team) {
+        Tower* t = findTower(team, 0);
+        return t != nullptr && t->isAlive() && t->isAwake();
+    }
+
     // The only way to express a fallen tower, since setTowerHp refuses hp <= 0.
     bool destroyTower(int team, int slot) {
         Tower* t = findTower(team, slot);
@@ -470,7 +489,7 @@ public:
             // Nothing may be placed on an existing building: the gap is its
             // radius plus the new card's footprint.
             for (const auto& entity : board.getEntities()) {
-                float r = entity->getCollisionRadius();
+                float r = entity->getPlacementRadius();
                 if (entity->isAlive() && r > 0.0f) {
                     float dx = x - entity->position.x;
                     float dy = y - entity->position.y;

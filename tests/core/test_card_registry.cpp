@@ -451,6 +451,10 @@ TEST_CASE("DefensiveBuilding archetype (Cannon)", "[card_registry][archetype]") 
 
     auto building = std::dynamic_pointer_cast<Building>(board.getEntities()[0]);
     REQUIRE(building != nullptr);
+    // the client's Cannon CollisionRadius 600 (Fidelity::clientBodies); every building was 1.0 before
+    REQUIRE(building->getCollisionRadius() == Catch::Approx(0.6f));
+    REQUIRE(building->getPlacementRadius() == Catch::Approx(1.0f));  // placement keeps the engine footprint
+    NoClientBodies legacy;
     REQUIRE(building->getCollisionRadius() == Catch::Approx(1.0f));
 }
 
@@ -965,6 +969,7 @@ TEST_CASE("A charging Battle Ram runs at twice its speed and hits for double",
 // 3 s). It was a single-target tower with no death bomb. Item 35.
 TEST_CASE("Bomb Tower splashes, and drops a 3-second bomb when destroyed", "[card_registry][splash][death]") {
     NoLoadTimes noLoadTimes;  // first-hit timing is not what this tests (test_load_times.cpp)
+    NoClientProjectiles instantHit;  // nor its bomb's flight (test_client_mechanics.cpp)
     SECTION("its bomb catches a troop next to the target, not one farther off") {
         Board board;
         CardRegistry::getInstance().getCard(27)->spawnEntity(5.0f, 5.0f, 0, board);
@@ -1580,6 +1585,7 @@ TEST_CASE("Bowler's piercing line hits a bystander behind the primary target, no
 }
 
 TEST_CASE("X-Bow can't fire until its slow initial deploy delay elapses", "[card_registry][deploy_delay]") {
+    NoClientProjectiles instantHit;  // the bolt's flight is not what this tests (test_client_mechanics.cpp)
     Board board;
     auto enemy = std::make_shared<DummyEntity>(1, 5.0f, 6.0f, 100000, 1); // well within X-Bow's range
     spawn(board, enemy);

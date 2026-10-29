@@ -29,6 +29,8 @@ private:
     struct Body {
         Entity* entity;
         float radius;
+        float body;   // bodyRadiusOf: the troop's own radius (Fidelity::clientBodies) or the implicit one
+        float mass;   // the client's Mass (Fidelity::clientBodies), 0 = equal pushes
         bool building;
         bool troop;
         bool flying;
@@ -256,7 +258,7 @@ public:
         return colliderCache;
     }
 
-    Vector2D resolvePositionAgainstBuildings(const Vector2D& pos, int entityId) const {
+    Vector2D resolvePositionAgainstBuildings(const Vector2D& pos, int entityId, float ownRadius = Entity::IMPLICIT_TROOP_RADIUS) const {
         Vector2D resolved = pos;
         // Ascending index order: the pushes compose, so order is part of the
         // answer.
@@ -264,7 +266,7 @@ public:
             const auto& entity = activeEntities[c.index];
             if (entity->id == entityId || !entity->isAlive()) continue;
 
-            resolved = pushAwayFrom(resolved, entity->position, c.radius + Entity::IMPLICIT_TROOP_RADIUS);
+            resolved = pushAwayFrom(resolved, entity->position, c.radius + ownRadius);
         }
         return resolved;
     }
@@ -281,7 +283,8 @@ public:
         for (const auto& e : activeEntities) {
             const float r = e->getCollisionRadius();
             bodyScratch.push_back(Body{
-                e.get(), r, r > 0.0f, (r <= 0.0f && e->isTargetable()), e->isFlying, e->isAlive() });
+                e.get(), r, bodyRadiusOf(*e), (Fidelity::clientBodies && e->mass > 0) ? static_cast<float>(e->mass) : 0.0f,
+                r > 0.0f, (r <= 0.0f && e->isTargetable()), e->isFlying, e->isAlive() });
         }
 
         for (size_t i = 0; i < count; ++i) {
@@ -309,31 +312,32 @@ public:
                     float dx = e1->position.x - e2->position.x;
                     float dy = e1->position.y - e2->position.y;
                     float dist = std::sqrt(dx * dx + dy * dy);
-                    float minRadius = 2.0f * Entity::IMPLICIT_TROOP_RADIUS;
+                    // Both bodies' radii (2 x IMPLICIT_TROOP_RADIUS unless Fidelity::clientBodies).
+                    float minRadius = b1.body + b2.body;
 
                     if (dist < minRadius) {
                         if (dist < 0.001f) { dx = 1.0f; dy = 0.0f; dist = 1.0f; }
                         float overlap = minRadius - dist;
-                        float pushX = (dx / dist) * overlap * 0.5f;
-                        float pushY = (dy / dist) * overlap * 0.5f;
+                        // The lighter body gives way (the client's Mass): each moves by the other's share of the
+                        // total mass; equal halves without masses.
+                        const float share1 = (b1.mass > 0.0f && b2.mass > 0.0f) ? b2.mass / (b1.mass + b2.mass) : 0.5f;
+                        const float share2 = 1.0f - share1;
+                        const float ux = dx / dist, uy = dy / dist;
 
                         // Tiny orthogonal nudge to prevent jitter lock.
                         float noise = 0.01f;
-                        pushX += (dy / dist) * noise;
-                        pushY -= (dx / dist) * noise;
-
-                        e1->position.x += pushX;
-                        e1->position.y += pushY;
-                        e2->position.x -= pushX;
-                        e2->position.y -= pushY;
+                        e1->position.x += ux * overlap * share1 + uy * noise;
+                        e1->position.y += uy * overlap * share1 - ux * noise;
+                        e2->position.x -= ux * overlap * share2 + uy * noise;
+                        e2->position.y -= uy * overlap * share2 - ux * noise;
                     }
                 }
 
                 if (isTroop1 && isBuilding2 && !b1.flying) {
-                    e1->position = pushAwayFrom(e1->position, e2->position, r2 + Entity::IMPLICIT_TROOP_RADIUS);
+                    e1->position = pushAwayFrom(e1->position, e2->position, r2 + b1.body);
                 }
                 if (isTroop2 && isBuilding1 && !b2.flying) {
-                    e2->position = pushAwayFrom(e2->position, e1->position, r1 + Entity::IMPLICIT_TROOP_RADIUS);
+                    e2->position = pushAwayFrom(e2->position, e1->position, r1 + b2.body);
                 }
             }
         }

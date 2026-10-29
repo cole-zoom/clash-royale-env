@@ -95,6 +95,14 @@ TEST_CASE("Tower::getCollisionRadius depends on symbol (King vs Princess)", "[to
     Tower king(1, 9.0f, 2.0f, 4008, 0, 7.0f, 90, 10, 'R');
     Tower princess(2, 3.0f, 5.0f, 2534, 0, 7.5f, 90, 8, 'P');
 
+    // the client's KingTower / PrincessTower CollisionRadius (Fidelity::clientBodies)
+    REQUIRE(king.getCollisionRadius() == Catch::Approx(1.4f));
+    REQUIRE(princess.getCollisionRadius() == Catch::Approx(1.0f));
+    // target selection and placement keep the engine's fitted footprints
+    REQUIRE(king.getTargetingRadius() == Catch::Approx(2.0f));
+    REQUIRE(princess.getTargetingRadius() == Catch::Approx(1.5f));
+    REQUIRE(princess.getPlacementRadius() == Catch::Approx(1.5f));
+    NoClientBodies legacy;
     REQUIRE(king.getCollisionRadius() == Catch::Approx(2.0f));
     REQUIRE(princess.getCollisionRadius() == Catch::Approx(1.5f));
 }

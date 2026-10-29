@@ -58,9 +58,11 @@ protected:
         }
         // On-hit effects travel with the shot and land when it does.
         auto arrow = std::make_shared<Projectile>(
-            board.allocateId(), position.x, position.y, team, target, 1.5f, getCurrentDamage(), onHitEffects,
+            board.allocateId(), position.x, position.y, team, target, shotSpeed(1.5f), getCurrentDamage(), onHitEffects,
             boomerang, boomerangReturnDelayTicks, id, cardId, splashRadius, lineSplash, lineSplashRange);
         if (burstPellets.count > 0) arrow->setBurst(burstPellets);
+        // after setBurst: a non-homing shell (Firecracker) flies to where the target stood
+        arrow->setHoming(shotHoming());
         board.addEntity(arrow);
     }
 };

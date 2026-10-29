@@ -1,5 +1,6 @@
 #pragma once
 #include "CombatEntity.h"
+#include "Projectile.h"
 #include "StatsEvents.h"
 
 class Building : public CombatEntity {
@@ -22,7 +23,13 @@ public:
     // outside.
     int getMaxHp() const { return maxHp; }
 
-    float getCollisionRadius() const override { return COLLISION_RADIUS; }
+    // The client's CollisionRadius for this building (bodyRadius, set from ClientMechanics.h) under
+    // Fidelity::clientBodies: Cannon 0.6, Tesla 0.5, huts 1.0, ...; COLLISION_RADIUS for every building before.
+    // Placement keeps COLLISION_RADIUS (CardFactories::placementRadius).
+    float getCollisionRadius() const override {
+        return (Fidelity::clientBodies && bodyRadius > 0.0f) ? bodyRadius : COLLISION_RADIUS;
+    }
+    float getPlacementRadius() const override { return COLLISION_RADIUS; }
 
     bool isBuilding() const override { return true; }
 
@@ -61,6 +68,17 @@ public:
 
 protected:
     void performAttack(Board& board, std::shared_ptr<Entity> target) override {
+        // A building whose client unit shoots a projectile (Cannon, X-Bow, Bomb Tower, ...) fires it
+        // (Fidelity::clientProjectiles); it hit at once before.
+        if (Fidelity::clientProjectiles && clientShotSpeed > 0.0f) {
+            auto shot = std::make_shared<Projectile>(
+                board.allocateId(), position.x, position.y, team, target, clientShotSpeed, getCurrentDamage(),
+                onHitEffects, false, 0, id, cardId, splashRadius, lineSplash, lineSplashRange);
+            shot->setSplashHitsAir(targetsAir);
+            shot->setHoming(clientShotHoming);
+            board.addEntity(shot);
+            return;
+        }
         int dealt = getCurrentDamage();
         target->takeDamage(dealt);
         board.statsEvents.notifyDamageDealt(

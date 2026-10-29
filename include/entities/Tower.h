@@ -1,6 +1,8 @@
 #pragma once
 #include "Building.h"
 #include "Projectile.h"
+#include "ClientMechanics.h"
+#include "CardStats.h"
 #include <algorithm>
 
 class Tower : public Building {
@@ -14,7 +16,11 @@ public:
         sightRange = attackRange;
     }
 
+    // The client's CollisionRadius (KingTower 1.4, PrincessTower 1.0) under Fidelity::clientBodies; before
+    // 2026-10-29 2.0 / 1.5. Attack reach to and from a tower uses it.
     float getCollisionRadius() const override {
+        if (Fidelity::clientBodies)
+            return ((symbol == 'R') ? CLIENT_KING_TOWER_COLLISION_RADIUS : CLIENT_PRINCESS_TOWER_COLLISION_RADIUS) / 1000.0f;
         return (symbol == 'R') ? 2.0f : 1.5f;
     }
 
@@ -25,8 +31,11 @@ public:
     // at the previous 3.3, which was fitted to one Hog-and-Cannon example and
     // stopped a Goblin Hut in the middle from pulling a Giant in the lane
     // (Giant 47% -> 85%). GAMEPLAY-AFFECTING: every pull and kite near a tower.
+    float getPlacementRadius() const override { return (symbol == 'R') ? 2.0f : 1.5f; }
+
+    // Kept at the fitted 1.5 / 2.0 when the collision radius follows the client: this is the pull fit's value.
     float getTargetingRadius() const override {
-        return getCollisionRadius();
+        return (symbol == 'R') ? 2.0f : 1.5f;
     }
 
     bool isTower() const override { return true; }
@@ -58,15 +67,22 @@ public:
     int getAttackCooldown() const { return attackCooldown; }
 
     bool isAwake() const { return awake; }
-    void wake() { awake = true; }
-    void sleep() { awake = false; }
+    // At once, whatever the activation delay: for setting up a King that woke before the state being built.
+    void wake() { awake = true; activationTicksLeft = -1; }
+    void sleep() { awake = false; activationTicksLeft = -1; }
+    bool isActivating() const { return activationTicksLeft >= 0; }
 
     void update(Board& board) override {
-        if (!awake) {
+        if (!awake && activationTicksLeft >= 0) {
+            // Activating (Fidelity::kingActivationDelay): the client's ActionDuration after the trigger.
+            if (activationTicksLeft == 0) { awake = true; activationTicksLeft = -1; }
+            else --activationTicksLeft;
+        } else if (!awake) {
+            bool trigger = false;
             // Trigger 1: any damage. Latched on hp < maxHp rather than hooked
             // into one of the several damage entry points; the latch only sets,
             // so a heal cannot re-sleep it.
-            if (hp < maxHp) awake = true;
+            if (hp < maxHp) trigger = true;
 
             // Trigger 2: a friendly Princess Tower destroyed. The count is
             // recorded on the first update rather than compared with 2, since a
@@ -76,7 +92,14 @@ public:
                 if (e->isAlive() && e->isTower() && e->team == team && e->symbol != 'R') ++living;
             }
             if (initialFriendlyPrincesses < 0) initialFriendlyPrincesses = living;
-            else if (living < initialFriendlyPrincesses) awake = true;
+            else if (living < initialFriendlyPrincesses) trigger = true;
+            if (trigger) {
+                // WaitForKingTowerActivation -> ActionDuration (king_tower.toml): 3.3 s from the trigger to the first
+                // possible shot. The first tick of it is this one.
+                const int ticks = Fidelity::kingActivationDelay ? (CLIENT_KING_ACTIVATION_MS + 50) / 100 : 0;
+                if (ticks <= 0) awake = true;
+                else activationTicksLeft = ticks - 1;
+            }
         }
         Building::update(board);
     }
@@ -92,9 +115,19 @@ protected:
     void performAttack(Board& board, std::shared_ptr<Entity> target) override {
         // lineSplash/lineSplashRange forwarded: a Tower Troop can carry them.
         auto arrow = std::make_shared<Projectile>(
-            board.allocateId(), position.x, position.y, team, target, 2.0f, getCurrentDamage(), onHitEffects,
+            board.allocateId(), position.x, position.y, team, target, towerShotSpeed(), getCurrentDamage(), onHitEffects,
             false, 0, id, cardId, splashRadius, lineSplash, lineSplashRange);
         board.addEntity(arrow);
+    }
+
+public:
+    // TowerPrincessProjectile 600 / KingProjectile 1000 (client units, the troop Speed conversion) under
+    // Fidelity::clientProjectiles; 2.0 tiles a tick before. A Tower Troop with its own client projectile keeps it.
+    float towerShotSpeed() const {
+        if (!Fidelity::clientProjectiles) return 2.0f;
+        if (clientShotSpeed > 0.0f) return clientShotSpeed;
+        const int s = (symbol == 'R') ? CLIENT_KING_TOWER_PROJECTILE_SPEED : CLIENT_PRINCESS_TOWER_PROJECTILE_SPEED;
+        return s * REAL_TILES_PER_MIN_TO_ENGINE * MOVEMENT_SPEED_SCALE;
     }
 
 private:
@@ -102,4 +135,6 @@ private:
     bool awake = true;
     // -1 until the first update() records the starting count.
     int initialFriendlyPrincesses = -1;
+    // Ticks left of the King's activation once triggered; -1 = not activating.
+    int activationTicksLeft = -1;
 };

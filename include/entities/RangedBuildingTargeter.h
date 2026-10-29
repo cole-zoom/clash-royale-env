@@ -27,8 +27,9 @@ protected:
         // lineSplash/lineSplashRange forwarded, as RangedTroop does; dropping
         // them silently turns a piercing shot into circular splash.
         auto proj = std::make_shared<Projectile>(
-            board.allocateId(), position.x, position.y, team, target, 1.5f, getCurrentDamage(), onHitEffects,
+            board.allocateId(), position.x, position.y, team, target, shotSpeed(1.5f), getCurrentDamage(), onHitEffects,
             false, 0, id, cardId, splashRadius, lineSplash, lineSplashRange);
+        proj->setHoming(shotHoming());
         board.addEntity(proj);
     }
 };

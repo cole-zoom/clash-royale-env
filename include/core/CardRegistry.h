@@ -963,9 +963,11 @@ private:
             .withCharge(3.0f, 2.0f).withChargeSpeed(2.0f).withDieAfterFirstHit().withSightRange(6.5f));
         // Royal Hogs jump the river.
         // client royalhog.toml Range 0.75 (was 1.0) (2026-10-28)
+        // No charge (2026-10-29): royalhog.toml has no ChargeRange / DamageSpecial (only Battle Ram, Ram Rider,
+        // Prince, Dark Prince and the Royal Recruits Evolution do); the engine gave them 2x after 3 tiles.
         add(troop(82, "Royal Hogs", 5.0f, Archetype::MeleeBuildingTargeter, 837, SPEED_VERY_FAST, 0.75f, 74, 12, '_')
             .withOffsets({ {-1.0f, -0.3f}, {-0.3f, 0.3f}, {0.3f, -0.3f}, {1.0f, 0.3f} })
-            .withCharge(3.0f, 2.0f).withSightRange(9.5f)
+            .withSightRange(9.5f)
             .withIgnoresRiver());
         // client wallbreaker.toml projectile Damage 118 -> 302, Range 0.5 (was 350, 1.0) (2026-10-28)
         add(troop(83, "Wall Breakers", 2.0f, Archetype::MeleeBuildingTargeter, 330, SPEED_VERY_FAST, 0.5f, 302, 12, '{')
@@ -1706,10 +1708,10 @@ private:
         addEvolution(162,
             troop(82, "Royal Hogs", 5.0f, Archetype::MeleeBuildingTargeter, 837, SPEED_VERY_FAST, 0.75f, 74, 12, '_')
                 .withOffsets({ {-1.0f, -0.3f}, {-0.3f, 0.3f}, {0.3f, -0.3f}, {1.0f, 0.3f} })
-                .withCharge(3.0f, 2.0f).withSightRange(9.5f).withIgnoresRiver(),
+                .withSightRange(9.5f).withIgnoresRiver(),  // no charge: see id 82
             troop(82, "Royal Hogs", 5.0f, Archetype::MeleeBuildingTargeter, 837, SPEED_VERY_FAST, 0.75f, 74, 12, '_')
                 .withOffsets({ {-1.0f, -0.3f}, {-0.3f, 0.3f}, {0.3f, -0.3f}, {1.0f, 0.3f} })
-                .withCharge(3.0f, 2.0f).withSightRange(9.5f).withIgnoresRiver(),
+                .withSightRange(9.5f).withIgnoresRiver(),  // no charge: see id 82
             2, 1);
 
         // Inferno Dragon ("Damage Charge-up"): identical stats to id 56. Losing

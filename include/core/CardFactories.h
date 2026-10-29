@@ -1,5 +1,6 @@
 #pragma once
 #include "LoadTimes.h"
+#include "ClientMechanics.h"
 #include "SpellTowerDamage.h"
 #include "CardStats.h"
 #include "Board.h"
@@ -33,6 +34,18 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     // A loaded unit's first hit (the preload model, CombatEntity::loadModel). A spawned body (negative id) takes
     // the playable card of the same name's.
     entity->firstHitTicks = (stats.id >= 0) ? firstHitTicksForCard(stats.id) : firstHitTicksForUnitName(stats.name);
+    // The client's per-unit projectile, body and mass (ClientMechanics.h), used under Fidelity::clientProjectiles /
+    // clientBodies. A spawned body (negative id) takes the playable card of the same name's.
+    {
+        const bool byId = stats.id >= 0;
+        const int shot = byId ? clientProjectileSpeedForCard(stats.id) : clientProjectileSpeedForUnitName(stats.name);
+        entity->clientShotSpeed = (shot > 0) ? shot * REAL_TILES_PER_MIN_TO_ENGINE * MOVEMENT_SPEED_SCALE : 0.0f;
+        entity->clientShotHoming = byId ? clientProjectileHomingForCard(stats.id) : clientProjectileHomingForUnitName(stats.name);
+        const int rad = byId ? clientCollisionRadiusForCard(stats.id) : clientCollisionRadiusForUnitName(stats.name);
+        entity->bodyRadius = (rad > 0) ? rad / 1000.0f : 0.0f;
+        const int m = byId ? clientMassForCard(stats.id) : clientMassForUnitName(stats.name);
+        entity->mass = (m > 0) ? m : 0;
+    }
     if (stats.archetype != Archetype::Spell) {
         const float ct = crownTowerFractionForCard(stats.id);
         if (ct >= 0.0f) entity->crownTowerFraction = ct;

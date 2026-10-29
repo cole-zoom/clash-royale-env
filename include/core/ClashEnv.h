@@ -660,6 +660,8 @@ public:
         return game.setTowerStats(team, slot, maxHp, damage, cooldownTicks);
     }
     bool destroyTower(int team, int slot) { return game.destroyTower(team, slot); }
+    bool wakeKing(int team) { return game.wakeKing(team); }
+    bool isKingAwake(int team) { return game.isKingAwake(team); }
     int getTowerHp(int team, int slot) const { return game.getTowerHp(team, slot); }
     int getTowerMaxHp(int team, int slot) const { return game.getTowerMaxHp(team, slot); }
 

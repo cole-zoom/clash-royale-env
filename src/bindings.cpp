@@ -148,6 +148,9 @@ PYBIND11_MODULE(clash_royale_env, m) {
              py::arg("team"), py::arg("slot"), py::arg("hp"))
         .def("destroy_tower", &ClashEnv::destroyTower,
              py::arg("team"), py::arg("slot"))
+        // Wake a sleeping King at once (no activation delay), for a state in which it woke earlier.
+        .def("wake_king", &ClashEnv::wakeKing, py::arg("team"))
+        .def("is_king_awake", &ClashEnv::isKingAwake, py::arg("team"))
         .def("get_tower_hp", &ClashEnv::getTowerHp,
              py::arg("team"), py::arg("slot"))
         .def("get_tower_max_hp", &ClashEnv::getTowerMaxHp,
@@ -261,6 +264,20 @@ PYBIND11_MODULE(clash_royale_env, m) {
     // (first hit = hit speed - load time; CombatEntity::loadModel).
     m.def("set_load_model", [](int model) { CombatEntity::loadModel = model; }, py::arg("model"));
     m.def("get_load_model", []() { return CombatEntity::loadModel; });
+    // Client-mechanics switches of 2026-10-29 (include/core/FidelitySwitches.h): each on by default; off restores
+    // the earlier engine for that mechanic alone.
+    m.def("set_target_queueing", [](bool on) { Fidelity::targetQueueing = on; }, py::arg("on"));
+    m.def("get_target_queueing", []() { return Fidelity::targetQueueing; });
+    m.def("set_aoe_lands_without_target", [](bool on) { Fidelity::aoeLandsWithoutTarget = on; }, py::arg("on"));
+    m.def("get_aoe_lands_without_target", []() { return Fidelity::aoeLandsWithoutTarget; });
+    m.def("set_crown_tower_sight_bonus", [](bool on) { Fidelity::crownTowerSightBonus = on; }, py::arg("on"));
+    m.def("get_crown_tower_sight_bonus", []() { return Fidelity::crownTowerSightBonus; });
+    m.def("set_client_projectiles", [](bool on) { Fidelity::clientProjectiles = on; }, py::arg("on"));
+    m.def("get_client_projectiles", []() { return Fidelity::clientProjectiles; });
+    m.def("set_client_bodies", [](bool on) { Fidelity::clientBodies = on; }, py::arg("on"));
+    m.def("get_client_bodies", []() { return Fidelity::clientBodies; });
+    m.def("set_king_activation_delay", [](bool on) { Fidelity::kingActivationDelay = on; }, py::arg("on"));
+    m.def("get_king_activation_delay", []() { return Fidelity::kingActivationDelay; });
     m.def("get_all_card_ids", &getAllCardIds,
         "All ids CardRegistry currently has registered (real, playable cards only).");
 

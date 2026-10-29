@@ -7,6 +7,8 @@
 #include "DeathEffect.h"
 #include "PeriodicEffect.h"
 #include "AbilityEffect.h"
+#include "ClientMechanics.h"
+#include <unordered_map>
 #include <memory>
 #include <limits>
 #include <vector>
@@ -163,6 +165,15 @@ public:
     // Whether findTarget() may pick a flyer. Only read on `this`, unlike
     // isFlying.
     bool targetsAir = false;
+
+    // The unit's own projectile (Fidelity::clientProjectiles): its client Speed in engine tiles per tick (0 = the
+    // engine's fixed speeds) and whether it homes. Set by CardFactories::applyCardMetadata / GameManager (towers).
+    float clientShotSpeed = 0.0f;
+    bool clientShotHoming = true;
+    float shotSpeed(float legacy) const {
+        return (Fidelity::clientProjectiles && clientShotSpeed > 0.0f) ? clientShotSpeed : legacy;
+    }
+    bool shotHoming() const { return !Fidelity::clientProjectiles || clientShotHoming; }
 
     // Fired once by onDeath() (e.g. Golem spawning Golemites).
     std::shared_ptr<IDeathEffect> deathEffect;
@@ -978,8 +989,7 @@ public:
     // Entity::IMPLICIT_TROOP_RADIUS. Public and static because AreaSpell's
     // rolling sweep needs it too.
     static float effectiveRadiusOf(const Entity& e) {
-        const float r = e.getCollisionRadius();
-        return (r > 0.0f) ? r : Entity::IMPLICIT_TROOP_RADIUS;
+        return bodyRadiusOf(e);  // Entity.h: the client's per-unit radius under Fidelity::clientBodies
     }
 
 protected:
@@ -992,6 +1002,11 @@ protected:
     }
 
     float ownEffectiveRadius() const { return effectiveRadiusOf(*this); }
+
+    static int shieldOf(const Entity& e) {
+        const auto* ce = dynamic_cast<const CombatEntity*>(&e);
+        return ce ? ce->shieldHp : 0;
+    }
 
     // Where the next periodic spawn lands: on this entity, or periodicSideOffset
     // to one side, alternating left then right (Evolved Furnace). Left is -x for
@@ -1047,7 +1062,10 @@ protected:
     static constexpr float TROOP_SIGHT_BONUS = 1.75f;
 
     float effectiveSightWith(float myRadius, const Entity& target) const {
-        const float sight = sightRange + ((!isBuilding() && !target.isBuilding()) ? TROOP_SIGHT_BONUS : 0.0f);
+        float sight = sightRange + ((!isBuilding() && !target.isBuilding()) ? TROOP_SIGHT_BONUS : 0.0f);
+        // EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS (globals.csv 2000): a troop sees a crown tower 2 tiles further.
+        if (Fidelity::crownTowerSightBonus && !isBuilding() && target.isTower())
+            sight += CLIENT_EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS / 1000.0f;
         const float attackReach = attackRange + myRadius + effectiveRadiusOf(target);
         if (sightEdgeToEdge) {
             const float edge = sight + myRadius + effectiveRadiusOf(target);
@@ -1084,8 +1102,22 @@ protected:
         float minTowerDistance = std::numeric_limits<float>::max();
 
         const float myRadius = ownEffectiveRadius();   // loop invariant
+        // Target queueing (Fidelity::targetQueueing; globals USE_TARGET_QUEUEING): damage already in flight, per
+        // target. A new target that it will kill is passed over; the current target is kept regardless
+        // (CURRENT_TARGET_IGNORES_PENDING_DAMAGE), which update() does by not calling this while locked in range.
+        std::unordered_map<int, int> pending;
+        if (Fidelity::targetQueueing) {
+            for (const auto& e : board.getEntities()) {
+                const int tid = e->incomingTargetId();
+                if (tid >= 0 && e->isAlive() && e->team == team) pending[tid] += e->incomingDamage();
+            }
+        }
         for (const auto& entity : board.getEntities()) {
             if (!isValidTarget(entity)) continue;
+            if (!pending.empty() && !entity->isTower()) {
+                const auto it = pending.find(entity->id);
+                if (it != pending.end() && it->second >= entity->hp + shieldOf(*entity)) continue;
+            }
             float dist = position.distanceTo(entity->position);
             if (entity->isTower() && dist < minTowerDistance) {
                 minTowerDistance = dist;

@@ -50,7 +50,7 @@ protected:
             newPos.y = position.y + (dy / distToWaypoint) * step;
 
             // Flying troops pass over building footprints.
-            position = isFlying ? newPos : board.resolvePositionAgainstBuildings(newPos, id);
+            position = isFlying ? newPos : board.resolvePositionAgainstBuildings(newPos, id, bodyRadiusOf(*this));
         }
     }
 

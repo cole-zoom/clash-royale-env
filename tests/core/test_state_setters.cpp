@@ -236,6 +236,9 @@ TEST_CASE("an injected wound wakes the King, exactly as real damage would",
     // wakes the King like any damage.
     REQUIRE(game.setTowerHp(1, 0, static_cast<float>(game.getTowerMaxHp(1, 0)) - 1.0f));
     king->update(board);
+    // ...after the client's activation (Fidelity::kingActivationDelay: 3.3 s from the trigger)
+    REQUIRE(king->isActivating());
+    for (int i = 0; i < (CLIENT_KING_ACTIVATION_MS + 50) / 100; ++i) king->update(board);
     REQUIRE(king->isAwake());
 }
 
@@ -246,7 +249,7 @@ TEST_CASE("setTowerHp back to full does NOT re-sleep a woken King",
     Tower* king = towerAt(board, 0, 0);
 
     REQUIRE(game.setTowerHp(0, 0, static_cast<float>(game.getTowerMaxHp(0, 0)) - 1.0f));
-    king->update(board);
+    for (int i = 0; i <= (CLIENT_KING_ACTIVATION_MS + 50) / 100; ++i) king->update(board);  // the trigger, then its activation
     REQUIRE(king->isAwake());
 
     // The flag latches: neither a heal nor a sensor misreading full health
@@ -284,10 +287,13 @@ TEST_CASE("destroying a Princess wakes that team's King and not the other's",
 
     REQUIRE(game.destroyTower(1, 1) == true);
 
-    theirs->update(board);
-    ours->update(board);
+    for (int i = 0; i <= (CLIENT_KING_ACTIVATION_MS + 50) / 100; ++i) {  // the trigger, then its activation
+        theirs->update(board);
+        ours->update(board);
+    }
     REQUIRE(theirs->isAwake());
     REQUIRE_FALSE(ours->isAwake());
+    REQUIRE_FALSE(ours->isActivating());
 }
 
 TEST_CASE("destroyTower refuses a tower that is already down", "[setters][tower]") {
