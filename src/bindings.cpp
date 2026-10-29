@@ -266,8 +266,14 @@ PYBIND11_MODULE(clash_royale_env, m) {
     m.def("get_load_model", []() { return CombatEntity::loadModel; });
     // Client-mechanics switches of 2026-10-29 (include/core/FidelitySwitches.h): each on by default; off restores
     // the earlier engine for that mechanic alone.
-    m.def("set_target_queueing", [](bool on) { Fidelity::targetQueueing = on; }, py::arg("on"));
-    m.def("get_target_queueing", []() { return Fidelity::targetQueueing; });
+    m.def("set_pending_damage_skip", [](bool on) { Fidelity::pendingDamageSkip = on; }, py::arg("on"));
+    m.def("get_pending_damage_skip", []() { return Fidelity::pendingDamageSkip; });
+    // Backward-compatible alias (the switch's name before 2026-10-29: the client's USE_TARGET_QUEUEING is a different
+    // rule, see FidelitySwitches.h).
+    m.def("set_target_queueing", [](bool on) { Fidelity::pendingDamageSkip = on; }, py::arg("on"));
+    m.def("get_target_queueing", []() { return Fidelity::pendingDamageSkip; });
+    m.def("set_pending_damage_client_rule", [](bool on) { Fidelity::pendingDamageClientRule = on; }, py::arg("on"));
+    m.def("get_pending_damage_client_rule", []() { return Fidelity::pendingDamageClientRule; });
     m.def("set_aoe_lands_without_target", [](bool on) { Fidelity::aoeLandsWithoutTarget = on; }, py::arg("on"));
     m.def("get_aoe_lands_without_target", []() { return Fidelity::aoeLandsWithoutTarget; });
     m.def("set_crown_tower_sight_bonus", [](bool on) { Fidelity::crownTowerSightBonus = on; }, py::arg("on"));
@@ -278,6 +284,20 @@ PYBIND11_MODULE(clash_royale_env, m) {
     m.def("get_client_bodies", []() { return Fidelity::clientBodies; });
     m.def("set_king_activation_delay", [](bool on) { Fidelity::kingActivationDelay = on; }, py::arg("on"));
     m.def("get_king_activation_delay", []() { return Fidelity::kingActivationDelay; });
+    // The attack cycle and targeting as the client's code runs them (2026-10-29, second batch; FidelitySwitches.h).
+#define CRE_FIDELITY_SWITCH(pyname, field) \
+    m.def("set_" pyname, [](bool on) { Fidelity::field = on; }, py::arg("on")); \
+    m.def("get_" pyname, []() { return Fidelity::field; });
+    CRE_FIDELITY_SWITCH("reload_from_attack_start", reloadFromAttackStart)
+    CRE_FIDELITY_SWITCH("stun_pauses_swing", stunPausesSwing)
+    CRE_FIDELITY_SWITCH("attack_finish_window", attackFinishWindow)
+    CRE_FIDELITY_SWITCH("started_swing_finishes", startedSwingFinishes)
+    CRE_FIDELITY_SWITCH("special_load_time", specialLoadTime)
+    CRE_FIDELITY_SWITCH("client_targeting", clientTargeting)
+    CRE_FIDELITY_SWITCH("king_first_shot_delay", kingFirstShotDelay)
+    CRE_FIDELITY_SWITCH("princess_first_shot_delay", princessFirstShotDelay)
+    CRE_FIDELITY_SWITCH("client_elixir_rate", clientElixirRate)
+#undef CRE_FIDELITY_SWITCH
     m.def("get_all_card_ids", &getAllCardIds,
         "All ids CardRegistry currently has registered (real, playable cards only).");
 

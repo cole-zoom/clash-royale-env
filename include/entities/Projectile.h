@@ -176,13 +176,21 @@ public:
     void setHoming(bool h) { homing = h || !isAreaShot(); }
     void setSplashHitsAir(bool on) { splashHitsAir = on; }
 
-    // Target queueing (Fidelity::targetQueueing): the damage this shot still carries to its target.
+    // The pending-damage skip (Fidelity::pendingDamageSkip): the damage this shot still carries to its target, and
+    // when it lands: the ticks update() still needs (it lands on the tick its step covers the remaining distance).
     int incomingTargetId() const override {
         if (outboundHitLanded) return -1;
         auto t = target.lock();
         return (t && t->isAlive()) ? t->id : -1;
     }
     int incomingDamage() const override { return outboundHitLanded ? 0 : damage; }
+    int incomingEtaMs() const override {
+        auto t = target.lock();
+        const Vector2D to = (t && t->isAlive() && homing) ? t->position : aimPoint;
+        const float d = position.distanceTo(to);
+        const int ticks = (speed > 0.0f) ? std::max(1, static_cast<int>(std::ceil(d / speed))) : 1;
+        return ticks * 100;
+    }
 
     bool isTargetable() const override { return false; }
 

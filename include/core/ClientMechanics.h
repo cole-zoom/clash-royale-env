@@ -17,6 +17,42 @@ inline constexpr int CLIENT_KING_ACTIVATION_MS = 3300;
 // globals.csv: a troop sees a crown tower this much further than its SightRange.
 inline constexpr int CLIENT_EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS = 2000;
 
+// Tower attack cycle (characters/princesstower.toml, king_tower.toml): LoadTime (absent = 0) and HitSpeed, ms.
+inline constexpr int CLIENT_PRINCESS_TOWER_LOAD_TIME_MS = 0;
+inline constexpr int CLIENT_PRINCESS_TOWER_HIT_SPEED_MS = 800;
+inline constexpr int CLIENT_KING_TOWER_LOAD_TIME_MS = 500;
+inline constexpr int CLIENT_KING_TOWER_HIT_SPEED_MS = 1000;
+
+// globals.csv, the attack cycle and targeting (docs/client-code-notes.md sections 1 and 3):
+// a lost target leaves the swing alive this long for a new target in reach (ATTACK_FINISH_TIME_MS);
+inline constexpr int CLIENT_ATTACK_FINISH_TIME_MS = 250;
+// damage in flight skips a candidate only if it lands sooner than this (LOGIC_PENDING_DAMAGE_IGNORE_IF_DURATION_LESS);
+inline constexpr int CLIENT_PENDING_DAMAGE_WINDOW_MS = 600;
+// the current target is kept this far past reach, thousandths of a tile (LOGIC_RANGE_EXTENSION_TO_KEEP_TARGET);
+inline constexpr int CLIENT_RANGE_EXTENSION_TO_KEEP_TARGET = 25;
+// a hit whose target is further than this past reach is cancelled (LOGIC_CANCEL_HIT_FROM_LONG_DISTANCE_RANGE).
+inline constexpr int CLIENT_CANCEL_HIT_DISTANCE = 1500;
+// Code constants, not table values (combat update 0x71fff599e4 in the 2026-10-29 build): a swing has started once
+// its attack timer is more than 50 ms into a hit cycle; a unit with a projectile keeps a target whose hit has started
+// up to 500 (thousandths of a tile) past reach (LOGIC_PRESERVE_TARGET_IF_HIT_STARTED).
+inline constexpr int CLIENT_HIT_STARTED_MS = 50;
+inline constexpr int CLIENT_PRESERVE_TARGET_IF_HIT_STARTED_RANGE = 500;
+
+// battle_timelines.csv "Default" (Ladder, Friendly): ms per full bar (10 elixir) in each section
+// (120 s, 120 s, 60 s), and the starting elixir.
+inline constexpr int CLIENT_ELIXIR_FULL_BAR_MS_1X = 28000;
+inline constexpr int CLIENT_ELIXIR_FULL_BAR_MS_2X = 14000;
+inline constexpr int CLIENT_ELIXIR_FULL_BAR_MS_3X = 9300;
+inline constexpr int CLIENT_STARTING_ELIXIR = 6;
+
+// The windup of a unit's special attack (SpecialLoadTime, ms): Fisherman's hook. 0 = none.
+inline int clientSpecialLoadTimeForCard(int cardId) {
+    switch (cardId) {
+        case 53: return 1300;  // Fisherman: Fisherman SpecialLoadTime 1300 ms, SpecialMinRange 3500, SpecialRange 7000
+        default: return 0;
+    }
+}
+
 // The unit's projectile Speed (client units; CardRegistry.h clientProjectileSpeed converts). -1 = no projectile.
 inline int clientProjectileSpeedForCard(int cardId) {
     switch (cardId) {

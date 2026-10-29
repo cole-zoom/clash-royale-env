@@ -47,7 +47,7 @@ protected:
             // (Entity::getTargetingRadius); the sight gate uses
             // effectiveSightWith on centre distance, as in
             // CombatEntity::findTarget.
-            const float rank = dist - entity->getTargetingRadius();
+            const float rank = targetRank(*entity, dist);
             if (rank <= effectiveSightWith(myRadius, *entity) && rank < minSightDistance) {
                 minSightDistance = rank;
                 closestInSight = entity;

@@ -34,6 +34,17 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     // A loaded unit's first hit (the preload model, CombatEntity::loadModel). A spawned body (negative id) takes
     // the playable card of the same name's.
     entity->firstHitTicks = (stats.id >= 0) ? firstHitTicksForCard(stats.id) : firstHitTicksForUnitName(stats.name);
+    // The client attack cycle (Fidelity::reloadFromAttackStart): LoadTime in ms where the first-hit rule applies.
+    entity->clientLoadMs = (stats.id >= 0) ? loadMsForCard(stats.id) : loadMsForUnitName(stats.name);
+    // The cycle runs on the engine's hit speed (attackCooldown). Where that is not the client's HitSpeed (the
+    // kamikazes Battle Ram and the Spirits, Executioner: 6 cards), the first hit stays the preload model's
+    // firstHitTicks (client HitSpeed - LoadTime): the attack starts that much short of the engine's cycle.
+    if (entity->clientLoadMs >= 0 && entity->firstHitTicks >= 0) {
+        const int preload = stats.attackCooldown * 100 - entity->firstHitTicks * 100;
+        if (std::abs(preload - entity->clientLoadMs) >= 100) entity->clientLoadMs = std::max(0, preload);
+    }
+    entity->loadFirstHit = stats.id >= 0 && loadFirstHitForCard(stats.id);
+    entity->specialLoadMs = (stats.id >= 0) ? clientSpecialLoadTimeForCard(stats.id) : 0;
     // The client's per-unit projectile, body and mass (ClientMechanics.h), used under Fidelity::clientProjectiles /
     // clientBodies. A spawned body (negative id) takes the playable card of the same name's.
     {
@@ -143,6 +154,8 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     // The client's LoadFirstHit (Sparky): spawns unloaded under the preload model (CombatEntity::loadModel).
     if (loadFirstHitForCard(stats.id) && entity->usesPreload() && stats.initialCooldownTicks < entity->preloadReloadTicks())
         entity->seedCooldown(entity->preloadReloadTicks());
+    // ...and under the client cycle: the whole LoadTime is missing at spawn.
+    if (entity->loadFirstHit && entity->clientLoadMs > 0) entity->loadMissingMs = entity->clientLoadMs;
     if (stats.passiveDamageReduction < 1.0f) entity->applyCurse(stats.passiveDamageReduction, 999999);
 }
 

@@ -155,6 +155,41 @@ public:
     // After a hit: the rest of the attack cycle, reloading.
     int preloadReloadTicks() const { return std::max(0, attackCooldown - firstHitTicks); }
 
+    // ---- The client attack cycle (Fidelity::reloadFromAttackStart and the switches after it; bot-77
+    // docs/client-code-notes.md section 1: combat update 0x71fff599e4, timer advance 0x71fff5ac3c, set target
+    // 0x71fff558e0, target removed 0x71fff591f8). Times in ms; the engine steps 100 ms a tick where the client
+    // steps 50. ----
+    // LoadTime for the cycle (LoadTimes.h loadMsForCard; crown towers: GameManager); -1 = not on the cycle.
+    int clientLoadMs = -1;
+    // Runs while attacking, by 100 ms x the hit-speed factor a tick; a hit lands each time it crosses a multiple
+    // of the hit speed. 0 = not attacking; an attack starts at clientLoadMs - loadMissingMs.
+    int attackTimerMs = 0;
+    // Load still missing: counts down 100 ms every tick whatever the unit does; set to the full load when an
+    // attack starts.
+    int loadMissingMs = 0;
+    // An attack is under way (the client's attack timer is non-zero; here a start at 0 counts too).
+    bool attacking = false;
+    // > 0 while a lost target's swing waits for a new target in reach (ATTACK_FINISH_TIME_MS).
+    int finishWindowMs = 0;
+    // The swing has started: the attack timer is more than CLIENT_HIT_STARTED_MS into its cycle.
+    bool swingStarted = false;
+    // LoadFirstHit (Sparky): spawns unloaded, reloads fully after every attack and on every stunned tick.
+    bool loadFirstHit = false;
+    // Special attack windup (Fidelity::specialLoadTime; SpecialLoadTime, ClientMechanics.h): the hook winds up
+    // specialLoadMs on its target before it fires.
+    int specialLoadMs = 0;
+    int specialLoadLeftMs = 0;
+    int specialTargetId = -1;
+
+    // Whether this unit runs the client attack cycle. Tower overrides it (Fidelity::kingFirstShotDelay /
+    // princessFirstShotDelay).
+    virtual bool clientCycleOn() const {
+        return Fidelity::reloadFromAttackStart && clientLoadMs >= 0 && usesPreload();
+    }
+    // The pending-damage rule's "attacker with a projectile" (the client's data has a Projectile): any unit with a
+    // client projectile speed, and the crown towers.
+    bool hasClientProjectile() const { return clientShotSpeed > 0.0f || isTower(); }
+
     // Damage-over-time mark (Dart Goblin / Firecracker Evolutions; see
     // applyDot, PoisonOnHit). Ticks down independently of freeze and curse.
     int dotDamagePerTick = 0;
@@ -662,6 +697,8 @@ public:
         moveSlowThisTick = (moveSlowTicks > 0) ? moveSlowFactor : 1.0f;
         if (moveSlowTicks > 0 && --moveSlowTicks == 0) moveSlowFactor = 1.0f;
         ticksSinceLastHit++; // zeroed below when a hit lands
+        // The client cycle's load: 100 ms a tick, unscaled, whatever the unit is doing.
+        if (loadMissingMs > 0) loadMissingMs = std::max(0, loadMissingMs - 100);
         if (ticksSinceAttack < TICKS_SINCE_ATTACK_NEVER) ticksSinceAttack++; // zeroed when an attack starts
 
         if (transformAtHpFraction > 0.0f && !hasTransformed && transformCheckMaxHp > 0
@@ -757,6 +794,12 @@ public:
             }
         }
 
+        if (clientCycleOn()) {
+            updateClientCycle(board, wasFrozen, stunned, slowThisTick);
+            clampPosition(board);
+            return;
+        }
+
         // Targeting. A taunt overrides everything. Otherwise the lock is
         // trusted only while the locked target is within attack range; out of
         // range (still approaching, knocked back, pulled away) there is no
@@ -802,7 +845,11 @@ public:
             float effectiveAttackRange = effectiveRangeTo(target);
 
             const bool hitStarted = usesPreload() && windupTargetId == target->id && windupTicksLeft > 0;
-            if (dist <= effectiveAttackRange || (hitStarted && dist <= effectiveAttackRange + HIT_CANCEL_DISTANCE)) {
+            const int hookStepMs = stunned ? 0 : static_cast<int>(std::lround(100.0f * slowThisTick));
+            if (specialTargetId >= 0 && specialTargetId != target->id) { specialTargetId = -1; specialLoadLeftMs = 0; }
+            if (specialTargetId == target->id && specialLoadLeftMs > 0) {
+                hookStep(target, dist, effectiveAttackRange, hookStepMs);  // the hook is winding up: stand
+            } else if (dist <= effectiveAttackRange || (hitStarted && dist <= effectiveAttackRange + HIT_CANCEL_DISTANCE)) {
                 bool windingUp = false;
                 if (usesPreload()) {
                     // LOAD_MODEL_PRELOAD: an attack starts once loaded (cooldown
@@ -844,121 +891,19 @@ public:
                 // Not while stunned: a stun holds the cooldown still, and a
                 // unit that was already ready must not swing through it.
                 if (!stunned && !windingUp && currentCooldown == 0.0f) {
-                    // Effects are applied by performAttack, since when they
-                    // fire depends on when the damage lands (at once for a
-                    // direct hit, on arrival for a projectile).
-                    lastAttackDistance = dist;
-                    ticksSinceAttack = 0;
-                    // Reset here, not on projectile arrival: the only
-                    // grace-period card (Inferno Dragon Evolution) attacks
-                    // instantly.
-                    ticksSinceLastHit = 0;
-                    if (burstEveryNAttacks > 0) {
-                        attacksSinceBurst++;
-                        currentHitIsBurst = (attacksSinceBurst >= burstEveryNAttacks);
-                        if (currentHitIsBurst) attacksSinceBurst = 0;
-                    } else {
-                        currentHitIsBurst = false;
-                    }
-                    if (maxSplitTargets <= 1) {
-                        currentHitCount = 1;
-                        performAttack(board, target);
-                    } else {
-                        auto targets = findSplitTargets(board, maxSplitTargets);
-                        currentHitCount = static_cast<int>(targets.size());
-                        for (const auto& t : targets) {
-                            performAttack(board, t);
-                        }
-                    }
-                    if (!attackSequenceDamage.empty()) {
-                        const int n = static_cast<int>(attackSequenceDamage.size());
-                        if (attackSequenceIndex == n - 1 && attackSequencePushback > 0.0f && target->isAlive()) {
-                            pushAway(*target, position, attackSequencePushback);
-                            target->clampPosition(board);
-                        }
-                        attackSequenceIndex = (attackSequenceIndex + 1) % n;
-                    }
+                    performHit(board, target, dist);
                     // LOAD_MODEL_PRELOAD: reload, then the next windup.
                     currentCooldown = static_cast<float>(usesPreload() ? preloadReloadTicks() : attackCooldown);
-                    if (chargeThreshold > 0.0f) {
-                        if (chargeIsSticky && chargeProgress >= chargeThreshold) chargeHasStuck = true;
-                        if (!chargeHasStuck) chargeProgress = 0.0f;
-                    }
-                    if (startsInvisible) visibleTicksRemaining = revealTicksAfterAttack;
                     // Little Prince's hit-speed ramp; ticksOnTarget already
                     // includes this hit.
-                    if (hitSpeedRampFullTick > 0) {
-                        float cooldownFraction = (ticksOnTarget >= hitSpeedRampFullTick) ? hitSpeedRampFullFraction
-                            : (ticksOnTarget >= hitSpeedRampMidTick) ? hitSpeedRampMidFraction
-                            : 1.0f;
-                        currentCooldown *= cooldownFraction;
-                    }
+                    if (hitSpeedRampFullTick > 0) currentCooldown *= hitSpeedRampFraction();
                     // Temporary ability haste (Cloaking Cape, Getaway Grenade).
                     if (temporaryInvisibilityTicksRemaining > 0) currentCooldown *= temporaryHitSpeedMultiplier;
-                    // Blade Rage: refresh the window, then haste the cooldown
-                    // just set, so continued hits keep the haste alive.
-                    if (selfHasteDurationTicks > 0) {
-                        selfHasteTicksRemaining = selfHasteDurationTicks;
-                        currentCooldown *= selfHasteCooldownMultiplier;
-                    }
-                    // Ally auras (Rune Giant's buff, Battle Healer's heal).
-                    if (healAllyAmount > 0) {
-                        applyAreaHeal(board, position, auraRadius, id, team, healAllyAmount);
-                    }
-                    if (auraEveryNAttacks > 0) {
-                        attacksSinceAura++;
-                        if (attacksSinceAura >= auraEveryNAttacks) {
-                            attacksSinceAura = 0;
-                            applyAreaBuff(board, position, auraRadius, id, team,
-                                auraBuffMultiplier, auraBuffDurationTicks, auraMaxTargets);
-                        }
-                    }
-                    if (recoilDistance > 0.0f) pushAway(*this, target->position, recoilDistance);
-                    // Evolved Bats: heals past starting hp, up to the absolute
-                    // healOnHitMaxHp; the second pulse follows in update().
-                    if (healOnHitAmount > 0 && hp < healOnHitMaxHp) {
-                        hp = std::min(hp + healOnHitAmount, healOnHitMaxHp);
-                    }
-                    if (healOnHitAmount > 0 && healOnHitSecondPulseDelayTicks > 0) {
-                        pendingHealPulseTicks = healOnHitSecondPulseDelayTicks;
-                    }
-                    // Evolved Skeletons: spawn on hit; the cap is inside
-                    // CappedSpawnOnHitEffect.
-                    if (onHitSpawnEffect) onHitSpawnEffect->apply(board, position, team);
-                    // Whirlwind pull (Evolved Valkyrie): the pull damage
-                    // reaches everyone in radius, including this attack's
-                    // target and buildings; only the physical pull exempts
-                    // buildings.
-                    if (onHitPullRadius > 0.0f) {
-                        if (onHitPullDamage > 0) {
-                            applySplashDamage(board, position, onHitPullRadius, -1, id, team, cardId, onHitPullDamage);
-                        }
-                        applyPullNearby(board, position, onHitPullRadius, onHitPullDistance, id, team);
-                    }
-                    // Fiery Flight's tornado, centred on the target and
-                    // additive: the primary target is not exempt.
-                    if (flightPulseTicksRemaining > 0 && flightPulseRadius > 0.0f) {
-                        applySplashDamage(board, target->position, flightPulseRadius, -1, id, team, cardId, flightPulseDamage);
-                        applyPullNearby(board, target->position, flightPulseRadius, flightPulsePullDistance, -1, team);
-                    }
-                    if (dieAfterFirstHit) hp = 0;
+                    // Blade Rage: haste the cooldown just set, so continued hits keep the haste alive.
+                    if (selfHasteDurationTicks > 0) currentCooldown *= selfHasteCooldownMultiplier;
                 }
-            } else if (!stunned && jumpMaxRange > 0.0f && dist >= jumpMinRange && dist <= jumpMaxRange && currentCooldown == 0.0f) {
-                // Jump (Mega Knight): close to just inside attack range and
-                // land a boosted, splashing hit at once.
-                ticksSinceAttack = 0;
-                pullToward(*this, target->position, dist - effectiveAttackRange + 0.1f);
-                int jumpDamage = static_cast<int>(getCurrentDamage() * jumpDamageMultiplier);
-                target->takeDamage(jumpDamage);
-                board.statsEvents.notifyDamageDealt(
-                    { id, team, cardId, target->id, target->cardId, target->team, jumpDamage, board.currentTick, target->isTower() });
-                applySplashDamage(board, target->position, jumpSplashRadius, target->id, id, team, cardId, jumpDamage);
-                currentCooldown = static_cast<float>(attackCooldown);
-            } else if (!stunned && hookRange > 0.0f && dist <= hookRange && currentCooldown == 0.0f) {
-                // Hook: pull the target to just inside melee range; the damage
-                // lands on a later hit. A no-op on a building.
-                pullToward(*target, position, dist - effectiveAttackRange + 0.1f);
-                currentCooldown = static_cast<float>(attackCooldown);
+            } else if (jumpStep(board, target, dist, effectiveAttackRange, stunned)) {
+            } else if (hookStep(target, dist, effectiveAttackRange, hookStepMs)) {
             } else {
                 if (usesPreload()) { windupTargetId = -1; windupTicksLeft = 0; }  // out of reach: no hit in progress
                 Vector2D beforeMove = position;
@@ -979,6 +924,306 @@ public:
         // a new target.
 
         clampPosition(board);
+    }
+
+
+    // One attack landing (both attack models): the damage (performAttack: at once, or a projectile), the counters
+    // and every on-attack effect. The cooldown / cycle is the caller's.
+    void performHit(Board& board, const std::shared_ptr<Entity>& target, float dist) {
+        // Effects are applied by performAttack, since when they
+        // fire depends on when the damage lands (at once for a
+        // direct hit, on arrival for a projectile).
+        lastAttackDistance = dist;
+        ticksSinceAttack = 0;
+        // Reset here, not on projectile arrival: the only
+        // grace-period card (Inferno Dragon Evolution) attacks
+        // instantly.
+        ticksSinceLastHit = 0;
+        if (burstEveryNAttacks > 0) {
+            attacksSinceBurst++;
+            currentHitIsBurst = (attacksSinceBurst >= burstEveryNAttacks);
+            if (currentHitIsBurst) attacksSinceBurst = 0;
+        } else {
+            currentHitIsBurst = false;
+        }
+        if (maxSplitTargets <= 1) {
+            currentHitCount = 1;
+            performAttack(board, target);
+        } else {
+            auto targets = findSplitTargets(board, maxSplitTargets);
+            currentHitCount = static_cast<int>(targets.size());
+            for (const auto& t : targets) {
+                performAttack(board, t);
+            }
+        }
+        if (!attackSequenceDamage.empty()) {
+            const int n = static_cast<int>(attackSequenceDamage.size());
+            if (attackSequenceIndex == n - 1 && attackSequencePushback > 0.0f && target->isAlive()) {
+                pushAway(*target, position, attackSequencePushback);
+                target->clampPosition(board);
+            }
+            attackSequenceIndex = (attackSequenceIndex + 1) % n;
+        }
+        if (chargeThreshold > 0.0f) {
+            if (chargeIsSticky && chargeProgress >= chargeThreshold) chargeHasStuck = true;
+            if (!chargeHasStuck) chargeProgress = 0.0f;
+        }
+        if (startsInvisible) visibleTicksRemaining = revealTicksAfterAttack;
+        // Blade Rage: refresh the window (the haste itself is on the cooldown / the cycle's step).
+        if (selfHasteDurationTicks > 0) selfHasteTicksRemaining = selfHasteDurationTicks;
+        // Ally auras (Rune Giant's buff, Battle Healer's heal).
+        if (healAllyAmount > 0) {
+            applyAreaHeal(board, position, auraRadius, id, team, healAllyAmount);
+        }
+        if (auraEveryNAttacks > 0) {
+            attacksSinceAura++;
+            if (attacksSinceAura >= auraEveryNAttacks) {
+                attacksSinceAura = 0;
+                applyAreaBuff(board, position, auraRadius, id, team,
+                    auraBuffMultiplier, auraBuffDurationTicks, auraMaxTargets);
+            }
+        }
+        if (recoilDistance > 0.0f) pushAway(*this, target->position, recoilDistance);
+        // Evolved Bats: heals past starting hp, up to the absolute
+        // healOnHitMaxHp; the second pulse follows in update().
+        if (healOnHitAmount > 0 && hp < healOnHitMaxHp) {
+            hp = std::min(hp + healOnHitAmount, healOnHitMaxHp);
+        }
+        if (healOnHitAmount > 0 && healOnHitSecondPulseDelayTicks > 0) {
+            pendingHealPulseTicks = healOnHitSecondPulseDelayTicks;
+        }
+        // Evolved Skeletons: spawn on hit; the cap is inside
+        // CappedSpawnOnHitEffect.
+        if (onHitSpawnEffect) onHitSpawnEffect->apply(board, position, team);
+        // Whirlwind pull (Evolved Valkyrie): the pull damage
+        // reaches everyone in radius, including this attack's
+        // target and buildings; only the physical pull exempts
+        // buildings.
+        if (onHitPullRadius > 0.0f) {
+            if (onHitPullDamage > 0) {
+                applySplashDamage(board, position, onHitPullRadius, -1, id, team, cardId, onHitPullDamage);
+            }
+            applyPullNearby(board, position, onHitPullRadius, onHitPullDistance, id, team);
+        }
+        // Fiery Flight's tornado, centred on the target and
+        // additive: the primary target is not exempt.
+        if (flightPulseTicksRemaining > 0 && flightPulseRadius > 0.0f) {
+            applySplashDamage(board, target->position, flightPulseRadius, -1, id, team, cardId, flightPulseDamage);
+            applyPullNearby(board, target->position, flightPulseRadius, flightPulsePullDistance, -1, team);
+        }
+        if (dieAfterFirstHit) hp = 0;
+    }
+
+    // Jump (Mega Knight): a ground target between jumpMinRange and jumpMaxRange is closed on: just inside attack
+    // range, with a boosted, splashing hit at once. Returns whether it jumped.
+    bool jumpStep(Board& board, const std::shared_ptr<Entity>& target, float dist, float reach, bool stunned) {
+        if (stunned || jumpMaxRange <= 0.0f || dist < jumpMinRange || dist > jumpMaxRange || currentCooldown != 0.0f)
+            return false;
+        ticksSinceAttack = 0;
+        pullToward(*this, target->position, dist - reach + 0.1f);
+        int jumpDamage = static_cast<int>(getCurrentDamage() * jumpDamageMultiplier);
+        target->takeDamage(jumpDamage);
+        board.statsEvents.notifyDamageDealt(
+            { id, team, cardId, target->id, target->cardId, target->team, jumpDamage, board.currentTick, target->isTower() });
+        applySplashDamage(board, target->position, jumpSplashRadius, target->id, id, team, cardId, jumpDamage);
+        currentCooldown = static_cast<float>(attackCooldown);
+        return true;
+    }
+
+    // Hook (Fisherman): a target beyond attack reach but within hookRange is pulled to just inside melee range; the
+    // damage lands on a later hit (a no-op on a building). Under Fidelity::specialLoadTime the hook first winds up
+    // its SpecialLoadTime (1.3 s) on that target, by stepMs a tick (0 while stunned), the unit standing; once started
+    // it runs wherever the target goes until the target changes (combat update 0x71fff599e4: special mode, +0x41 /
+    // +0x44). Returns whether the hook acted this tick (winding up or firing).
+    bool hookStep(const std::shared_ptr<Entity>& target, float dist, float reach, int stepMs) {
+        const bool winding = specialTargetId == target->id && specialLoadLeftMs > 0;
+        if (!winding) {
+            if (stepMs <= 0 || hookRange <= 0.0f || dist <= reach || dist > hookRange || currentCooldown != 0.0f)
+                return false;
+            if (Fidelity::specialLoadTime && specialLoadMs > 0) {
+                specialTargetId = target->id;
+                specialLoadLeftMs = specialLoadMs;
+            }
+        }
+        if (specialLoadLeftMs > 0) {
+            specialLoadLeftMs -= stepMs;
+            if (specialLoadLeftMs > 0) return true;  // still winding up
+        }
+        specialTargetId = -1;
+        specialLoadLeftMs = 0;
+        pullToward(*target, position, dist - reach + 0.1f);
+        currentCooldown = static_cast<float>(attackCooldown);
+        return true;
+    }
+
+    // ---- The client attack cycle (clientCycleOn; FidelitySwitches.h, bot-77 docs/client-code-notes.md s. 1) ----
+    void resetSwing() {
+        attacking = false;
+        attackTimerMs = 0;
+        swingStarted = false;
+        finishWindowMs = 0;
+    }
+
+    // Whether the current target stays locked (no rescan): within reach + 0.025 (LOGIC_RANGE_EXTENSION_TO_KEEP_
+    // TARGET), or + 0.5 for a projectile unit whose hit has started (LOGIC_PRESERVE_TARGET_IF_HIT_STARTED). Without
+    // Fidelity::startedSwingFinishes: the preload model's rule, reach + 1.5 while the hit has started.
+    bool clientKeepsTarget(const std::shared_ptr<Entity>& t) const {
+        const float d = position.distanceTo(t->position), reach = effectiveRangeTo(t);
+        if (!Fidelity::startedSwingFinishes) return d <= reach + (swingStarted ? HIT_CANCEL_DISTANCE : 0.0f);
+        if (d <= reach + CLIENT_RANGE_EXTENSION_TO_KEEP_TARGET / 1000.0f) return true;
+        return swingStarted && hasClientProjectile() && d <= reach + CLIENT_PRESERVE_TARGET_IF_HIT_STARTED_RANGE / 1000.0f;
+    }
+
+    // The attack timer's step this tick: 100 ms x the hit-speed factor (a freeze's slow, 0 when stunned; the haste
+    // of the Cloaking Cape / Getaway Grenade, Blade Rage, Little Prince's ramp, which the preload model applies to
+    // its cooldown instead).
+    int clientCycleStepMs(bool wasFrozen, bool stunned, float slowThisTick) const {
+        if (stunned) return 0;
+        float rate = wasFrozen ? slowThisTick : 1.0f;
+        if (hitSpeedRampFullTick > 0) rate /= hitSpeedRampFraction();
+        if (temporaryInvisibilityTicksRemaining > 0 && temporaryHitSpeedMultiplier > 0.0f) rate /= temporaryHitSpeedMultiplier;
+        if (selfHasteTicksRemaining > 0 && selfHasteCooldownMultiplier > 0.0f) rate /= selfHasteCooldownMultiplier;
+        return std::max(0, static_cast<int>(std::lround(100.0f * rate)));
+    }
+
+    // One tick of targeting and attacking under the client's cycle (replaces the preload model's part of update()).
+    void updateClientCycle(Board& board, bool wasFrozen, bool stunned, float slowThisTick) {
+        const int hitSpeedMs = std::max(1, attackCooldown) * 100;
+        const bool pauses = Fidelity::stunPausesSwing;
+        // Sparky (LoadFirstHit, LOGIC_LOAD_FIRST_HIT_RESET_TIMER_WHEN_ZAPPED): each stunned tick empties her load.
+        if (stunned && loadFirstHit) {
+            resetSwing();
+            loadMissingMs = std::max(0, clientLoadMs);
+        }
+        // A stun drops the target every tick (0x71fff11980) and the nearest is re-acquired. Without stunPausesSwing:
+        // any freeze drops it, and a stun resets the swing (the preload model's full rewindup).
+        const bool dropTarget = pauses ? stunned : wasFrozen;
+        if (!pauses && stunned) resetSwing();
+
+        std::shared_ptr<Entity> target;
+        bool standInWindow = false;
+        if (forcedTargetTicksRemaining > 0) {
+            for (const auto& e : board.getEntities()) {
+                if (e->id == forcedTargetEntityId && e->isAlive() && e->isTargetable()) { target = e; break; }
+            }
+        }
+        const int prevTargetId = currentTargetId;
+        if (!target) {
+            std::shared_ptr<Entity> cur = dropTarget ? nullptr : resolveCurrentTarget(board);
+            bool loseSwing = false;
+            if (!dropTarget && !cur && prevTargetId >= 0 && attacking && finishWindowMs == 0) {
+                // The target died or vanished mid-cycle (target removed 0x71fff591f8).
+                if (Fidelity::attackFinishWindow) finishWindowMs = 1;
+                else loseSwing = true;
+            }
+            if (cur && clientKeepsTarget(cur)) {
+                target = cur;
+            } else {
+                auto cand = findTarget(board);
+                const bool candInReach = cand && position.distanceTo(cand->position) <= effectiveRangeTo(cand);
+                if (finishWindowMs > 0) {
+                    if (candInReach) {
+                        target = cand;  // keeps the cycle
+                        finishWindowMs = 0;
+                    } else {
+                        finishWindowMs += 100;
+                        if (finishWindowMs >= CLIENT_ATTACK_FINISH_TIME_MS) {
+                            resetSwing();  // the swing is lost; the load keeps counting
+                            target = cand;
+                        } else {
+                            standInWindow = true;  // waits for a target in reach
+                        }
+                    }
+                } else {
+                    if (loseSwing && !candInReach) resetSwing();
+                    target = cand;
+                }
+            }
+            // Set target (0x71fff558e0): a new target out of reach resets the swing, one in reach keeps it. While
+            // stunned every tick's target is a new one.
+            if (target && attacking && (dropTarget || target->id != prevTargetId)
+                && position.distanceTo(target->position) > effectiveRangeTo(target)) {
+                resetSwing();
+            }
+        }
+
+        if (!target) {
+            if (wasFrozen || rampGracePeriodTicks <= 0 || ticksSinceLastHit >= rampGracePeriodTicks) {
+                currentTargetId = -1;
+                ticksOnTarget = 0;
+                ticksSinceLastHit = 0;
+            }
+            (void)standInWindow;
+            return;
+        }
+
+        // Ramp bookkeeping, as in the preload model.
+        if (wasFrozen) {
+            currentTargetId = target->id;
+            ticksOnTarget = 0;
+            ticksSinceLastHit = 0;
+        } else if (target->id != currentTargetId) {
+            bool withinGrace = rampGracePeriodTicks > 0 && ticksSinceLastHit < rampGracePeriodTicks;
+            currentTargetId = target->id;
+            if (!withinGrace) ticksOnTarget = 0;
+        } else {
+            ticksOnTarget++;
+        }
+
+        const float dist = position.distanceTo(target->position);
+        const float reach = effectiveRangeTo(target);
+        const int stepMs = clientCycleStepMs(wasFrozen, stunned, slowThisTick);
+        const bool advance = dist <= reach
+            || (Fidelity::startedSwingFinishes ? swingStarted : (swingStarted && dist <= reach + HIT_CANCEL_DISTANCE));
+
+        if (specialTargetId >= 0 && specialTargetId != target->id) { specialTargetId = -1; specialLoadLeftMs = 0; }
+        if (specialTargetId == target->id && specialLoadLeftMs > 0) {
+            hookStep(target, dist, reach, stepMs);  // the hook is winding up: stand
+        } else if (advance) {
+            // Timer advance (0x71fff5ac3c): nothing while the step is 0 (stunned: the swing pauses). An attack starts
+            // LoadTime minus the missing load into its cycle, and the load is reset to full at that start.
+            if (stepMs > 0) {
+                // The client steps the new attack's timer in the update that starts it (50 ms), so its first hit
+                // comes HitSpeed - LoadTime - 50 ms after that update; at 100 ms a tick the engine can only land it
+                // 100 ms early or on time, and keeps the preload model's on-time (HitSpeed - LoadTime after the
+                // start tick), which the 10-29 replay check of the Hog's first tower hit supports.
+                // A seeded hold (X-Bow's 3.5 s deploy delay, seedCooldown) or a jump / hook's cooldown delays the
+                // start, as in the preload model. Not Sparky's spawn seed: her unloaded start is loadMissingMs here.
+                const bool starting = !attacking;
+                if (starting && currentCooldown > 0.0f && !loadFirstHit) {
+                    // not yet
+                } else if (starting) {
+                    attacking = true;
+                    attackTimerMs = std::max(0, clientLoadMs - loadMissingMs);
+                    loadMissingMs = std::max(0, clientLoadMs);
+                }
+                const int before = attackTimerMs;
+                if (!starting && attacking) attackTimerMs += stepMs;
+                swingStarted = (attackTimerMs % hitSpeedMs) > CLIENT_HIT_STARTED_MS;
+                if (attackTimerMs / hitSpeedMs > before / hitSpeedMs) {
+                    // A hit; cancelled when the target is too far past reach (LOGIC_CANCEL_HIT_FROM_LONG_DISTANCE).
+                    if (dist <= reach + CLIENT_CANCEL_HIT_DISTANCE / 1000.0f) performHit(board, target, dist);
+                    if (loadFirstHit) {  // LOGIC_LOAD_FIRST_HIT_RESET_TIMER_AFTER_ATTACK
+                        resetSwing();
+                        loadMissingMs = std::max(0, clientLoadMs);
+                    }
+                }
+            }
+            // attacking: no movement
+        } else if (jumpStep(board, target, dist, reach, stunned)) {
+        } else if (hookStep(target, dist, reach, stepMs)) {
+        } else {
+            resetSwing();  // out of reach before the swing started: dropped, walk
+            Vector2D beforeMove = position;
+            moveTowards(board, LanePath::approachPoint(board, team, position, target));
+            if (chargeThreshold > 0.0f) chargeProgress += beforeMove.distanceTo(position);
+        }
+    }
+
+    float hitSpeedRampFraction() const {
+        return (ticksOnTarget >= hitSpeedRampFullTick) ? hitSpeedRampFullFraction
+            : (ticksOnTarget >= hitSpeedRampMidTick) ? hitSpeedRampMidFraction
+            : 1.0f;
     }
 
     void onDeath(Board& board) override {
@@ -1062,6 +1307,15 @@ protected:
     static constexpr float TROOP_SIGHT_BONUS = 1.75f;
 
     float effectiveSightWith(float myRadius, const Entity& target) const {
+        if (Fidelity::clientTargeting) {
+            // Find target 0x71fff56878: SightRange + own radius (ADD_CHARACTER_RANGE_TO_RADIUS) + the candidate's
+            // radius, + EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS to a crown tower; tested on centre distance. No troop bonus
+            // (TROOP_SIGHT_BONUS was a fit to this) and no floor at attack reach.
+            float edge = sightRange + myRadius + effectiveRadiusOf(target);
+            if (Fidelity::crownTowerSightBonus && !isBuilding() && target.isTower())
+                edge += CLIENT_EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS / 1000.0f;
+            return edge;
+        }
         float sight = sightRange + ((!isBuilding() && !target.isBuilding()) ? TROOP_SIGHT_BONUS : 0.0f);
         // EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS (globals.csv 2000): a troop sees a crown tower 2 tiles further.
         if (Fidelity::crownTowerSightBonus && !isBuilding() && target.isTower())
@@ -1102,16 +1356,7 @@ protected:
         float minTowerDistance = std::numeric_limits<float>::max();
 
         const float myRadius = ownEffectiveRadius();   // loop invariant
-        // Target queueing (Fidelity::targetQueueing; globals USE_TARGET_QUEUEING): damage already in flight, per
-        // target. A new target that it will kill is passed over; the current target is kept regardless
-        // (CURRENT_TARGET_IGNORES_PENDING_DAMAGE), which update() does by not calling this while locked in range.
-        std::unordered_map<int, int> pending;
-        if (Fidelity::targetQueueing) {
-            for (const auto& e : board.getEntities()) {
-                const int tid = e->incomingTargetId();
-                if (tid >= 0 && e->isAlive() && e->team == team) pending[tid] += e->incomingDamage();
-            }
-        }
+        const std::unordered_map<int, int> pending = pendingDamage(board);
         for (const auto& entity : board.getEntities()) {
             if (!isValidTarget(entity)) continue;
             if (!pending.empty() && !entity->isTower()) {
@@ -1125,8 +1370,9 @@ protected:
             }
             // The tower tracking above serves only the fallback. Ranked by
             // footprint distance (Entity::getTargetingRadius); the sight gate
-            // uses centre distance.
-            const float rank = dist - entity->getTargetingRadius();
+            // uses centre distance. Fidelity::clientTargeting: plain centre
+            // distance for both.
+            const float rank = targetRank(*entity, dist);
             if (rank <= effectiveSightWith(myRadius, *entity) && rank < minSightDistance) {
                 minSightDistance = rank;
                 closestInSight = entity;
@@ -1141,6 +1387,32 @@ protected:
         auto laneTarget = LanePath::laneObjective(board, team, position);
         if (laneTarget && isValidTarget(laneTarget)) return laneTarget;
         return closestTower;
+    }
+
+    // Ranking distance of a candidate: centre distance under Fidelity::clientTargeting (find target 0x71fff56878:
+    // squared centre distance after the priority class), else centre distance minus its fitted targeting radius
+    // (Tower::getTargetingRadius 1.5 / 2.0, fitted to building pulls on 2026-10-28). The sight gate compares the same
+    // number with effectiveSightWith.
+    static float targetRank(const Entity& candidate, float centreDist) {
+        return Fidelity::clientTargeting ? centreDist : centreDist - candidate.getTargetingRadius();
+    }
+
+    // The pending-damage skip (Fidelity::pendingDamageSkip): damage already in flight from this unit's team, per
+    // target. A new target that it will kill is passed over; the current target is kept regardless
+    // (CURRENT_TARGET_IGNORES_PENDING_DAMAGE), which update() does by not calling findTarget while locked in range.
+    // Fidelity::pendingDamageClientRule: only an attacker with a projectile skips, and only damage landing within
+    // CLIENT_PENDING_DAMAGE_WINDOW_MS (LOGIC_PENDING_DAMAGE_IGNORE_IF_DURATION_LESS) counts.
+    std::unordered_map<int, int> pendingDamage(Board& board) const {
+        std::unordered_map<int, int> pending;
+        if (!Fidelity::pendingDamageSkip) return pending;
+        if (Fidelity::pendingDamageClientRule && !hasClientProjectile()) return pending;
+        for (const auto& e : board.getEntities()) {
+            const int tid = e->incomingTargetId();
+            if (tid < 0 || !e->isAlive() || e->team != team) continue;
+            if (Fidelity::pendingDamageClientRule && e->incomingEtaMs() >= CLIENT_PENDING_DAMAGE_WINDOW_MS) continue;
+            pending[tid] += e->incomingDamage();
+        }
+        return pending;
     }
 
     // For maxSplitTargets > 1 (Electro Wizard): the N closest valid targets.

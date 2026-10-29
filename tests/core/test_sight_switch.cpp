@@ -5,6 +5,8 @@
 // The edge-to-edge calibration switch widens sight by both radii and is off
 // by default (the strict centre-to-centre rule test_sight_range.cpp pins).
 TEST_CASE("sightEdgeToEdge adds both radii to sight, and defaults off", "[sight][calibration]") {
+    // A calibration of the fitted rule; under Fidelity::clientTargeting sight is always edge to edge.
+    NoClientTargeting fitted;
     REQUIRE_FALSE(CombatEntity::sightEdgeToEdge);
     std::vector<int> deck = {0, 1, 2, 3, 4, 5, 6, 7};
     ClashEnv env(deck, deck);

@@ -77,6 +77,9 @@ private:
         // This overload skips applyCardMetadata, so sightRange is set directly.
         // It only builds the King (sourced 7.0); Tower Troops go through the
         // overload below.
+        // The client attack cycle for crown towers (Tower::clientCycleOn: Fidelity::kingFirstShotDelay /
+        // princessFirstShotDelay): King LoadTime 500, Princess none (king_tower.toml, princesstower.toml).
+        tower->clientLoadMs = (symbol == 'R') ? CLIENT_KING_TOWER_LOAD_TIME_MS : CLIENT_PRINCESS_TOWER_LOAD_TIME_MS;
         if (symbol == 'R') {
             tower->sightRange = 7.0f;
             // The King starts dormant (Tower::isAwake); this is the only path
@@ -108,6 +111,11 @@ private:
         tower->mass = 0;
         tower->clientShotSpeed = 0.0f;
         tower->clientShotHoming = true;
+        // Not the Knight's load either: the Princess Tower has no LoadTime (princesstower.toml), so under
+        // Fidelity::princessFirstShotDelay its first arrow comes one HitSpeed after it acquires.
+        tower->clientLoadMs = CLIENT_PRINCESS_TOWER_LOAD_TIME_MS;
+        tower->loadFirstHit = false;
+        tower->specialLoadMs = 0;
         tower->name = towerName;
         tower->cardId = TOWER_PRINCESS_ID;
         board.addEntity(tower);
@@ -227,6 +235,17 @@ public:
     // The shared phase for both players; oppElixirMultiplier is a separate
     // per-opponent handicap that composes with it (see step()).
     float getElixirMultiplier() const { return elixirMultiplierAtTick(currentTick); }
+
+    // Elixir gained per tick at `tick`: ELIXIR_REGEN_RATE x the phase, or under Fidelity::clientElixirRate (off by
+    // default) the client's Default timeline, one 10-elixir bar per CLIENT_ELIXIR_FULL_BAR_MS_1X / 2X / 3X
+    // (28 / 14 / 9.3 s: 2.8 s an elixir at 1x, against the engine's 2.857).
+    float elixirRegenPerTick(int tick) const {
+        const float phase = elixirMultiplierAtTick(tick);
+        if (!Fidelity::clientElixirRate) return ELIXIR_REGEN_RATE * phase;
+        const int barMs = (phase >= MAX_ELIXIR_MULTIPLIER) ? CLIENT_ELIXIR_FULL_BAR_MS_3X
+            : (phase >= 2.0f) ? CLIENT_ELIXIR_FULL_BAR_MS_2X : CLIENT_ELIXIR_FULL_BAR_MS_1X;
+        return 10.0f * 100.0f / static_cast<float>(barMs);
+    }
 
     PlayerState playerAI;
     PlayerState playerOpponent;
@@ -725,9 +744,10 @@ public:
         // players. oppElixirMultiplier multiplies on top: a 1.5x opponent in
         // double elixir gets 3x, as intended.
         const float elixirPhase = getElixirMultiplier();
-        playerAI.elixir = std::min(playerAI.elixir + ELIXIR_REGEN_RATE * elixirPhase, 10.0f);
-        playerOpponent.elixir = std::min(
-            playerOpponent.elixir + ELIXIR_REGEN_RATE * elixirPhase * oppElixirMultiplier, 10.0f);
+        const float regen = elixirRegenPerTick(currentTick);
+        playerAI.elixir = std::min(playerAI.elixir + regen, 10.0f);
+        playerOpponent.elixir = std::min(playerOpponent.elixir + regen * oppElixirMultiplier, 10.0f);
+        (void)elixirPhase;
         playerAI.tick();
         playerOpponent.tick();
 

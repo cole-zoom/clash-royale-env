@@ -40,6 +40,15 @@ public:
 
     bool isTower() const override { return true; }
 
+    // The client attack cycle for crown towers (CombatEntity::updateClientCycle): the King's first shot LoadTime
+    // 500 ms into its 1000 ms cycle, 0.5 s after it acquires (Fidelity::kingFirstShotDelay); the Princess Tower's
+    // one HitSpeed after it acquires from idle (Fidelity::princessFirstShotDelay, off by default). GameManager sets
+    // clientLoadMs; a tower built elsewhere (tests) has none.
+    bool clientCycleOn() const override {
+        if (clientLoadMs < 0) return false;
+        return (symbol == 'R') ? Fidelity::kingFirstShotDelay : Fidelity::princessFirstShotDelay;
+    }
+
     // Its own override: Building's would slice a Tower to a plain Building,
     // losing isTower() and the tower fallback in findTarget. The copy carries
     // `awake`, so a snapshotted King stays dormant.

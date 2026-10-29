@@ -79,7 +79,9 @@ TEST_CASE("sight is measured CENTRE-TO-CENTRE against the raw sightRange",
     // Sight is strict centre-to-centre: against a troop it is the raw 5.5 plus
     // the measured 1.75 troop-on-troop bonus (CombatEntity::TROOP_SIGHT_BONUS,
     // 2026-10-28), so 7.25. Bounded from both sides: a uniformly blind engine
-    // fails the second REQUIRE, a radius-inflated one the first.
+    // fails the second REQUIRE, a radius-inflated one the first. The fitted rule (Fidelity::clientTargeting off);
+    // the client's edge-to-edge sight is pinned in tests/core/test_client_cycle.cpp.
+    NoClientTargeting fitted;
     Board board;
 
     SECTION("just OUTSIDE the raw sightRange: not acquired") {

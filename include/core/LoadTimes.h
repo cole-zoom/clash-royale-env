@@ -432,3 +432,266 @@ inline int firstHitTicksForUnitName(const std::string& name) {
     if (name == "Zappies") return 8;
     return -1;
 }
+
+// LoadTime in ms, for the client attack cycle (CombatEntity: an attack starts LoadTime minus the missing load into
+// its HitSpeed cycle, and the load is reset to full at that start). -1 where firstHitTicksForCard is -1 (no entry,
+// or a load not shorter than the hit speed).
+inline int loadMsForCard(int cardId) {
+    switch (cardId) {
+        case 0: return 700;  // Knight: Knight LoadTime 700 ms
+        case 1: return 400;  // Archers: Archer LoadTime 400 ms
+        case 2: return 1000;  // Giant: Giant LoadTime 1000 ms
+        case 4: return 500;  // Goblins: Goblin_Stab LoadTime 500 ms
+        case 5: return 1100;  // Mini PEKKA: MiniPekka LoadTime 1100 ms
+        case 6: return 300;  // Musketeer: Musketeer LoadTime 300 ms
+        case 8: return 1000;  // Barbarians: Barbarian LoadTime 1000 ms
+        case 9: return 1600;  // Bomber: Bomber LoadTime 1600 ms
+        case 10: return 1400;  // Valkyrie: Valkyrie LoadTime 1400 ms
+        case 11: return 900;  // Wizard: Wizard LoadTime 900 ms
+        case 12: return 600;  // Skeleton Army: Skeleton LoadTime 600 ms
+        case 13: return 1300;  // P.E.K.K.A.: Pekka LoadTime 1300 ms
+        case 14: return 900;  // Prince: Prince LoadTime 900 ms
+        case 15: return 1000;  // Hog Rider: HogRider LoadTime 1000 ms
+        case 17: return 900;  // Elite Barbarians: AngryBarbarian LoadTime 900 ms
+        case 18: return 900;  // Royal Giant: RoyalGiant LoadTime 900 ms
+        case 19: return 1500;  // Golem: Golem LoadTime 1500 ms
+        case 20: return 450;  // Dart Goblin: BlowdartGoblin LoadTime 450 ms
+        case 21: return 400;  // Lumberjack: RageBarbarian LoadTime 400 ms
+        case 22: return 2000;  // Bowler: Bowler LoadTime 2000 ms
+        case 23: return 1100;  // Spear Goblins: SpearGoblin LoadTime 1100 ms
+        case 24: return 600;  // Skeletons: Skeleton LoadTime 600 ms
+        case 25: return 100;  // Cannon: Cannon LoadTime 100 ms
+        case 26: return 700;  // Tesla: Tesla LoadTime 700 ms
+        case 27: return 1300;  // Bomb Tower: BombTower LoadTime 1300 ms
+        case 28: return -1;  // Inferno Tower: InfernoTower LoadTime 1200 ms
+        case 34: return 1200;  // Ice Wizard: IceWizard LoadTime 1200 ms
+        case 35: return 1200;  // Electro Wizard: ElectroWizard LoadTime 1200 ms
+        case 36: return 400;  // Executioner: AxeMan LoadTime 400 ms
+        case 39: return 1000;  // Giant Skeleton: GiantSkeleton LoadTime 1000 ms
+        case 40: return 1500;  // Ice Golem: IceGolemite LoadTime 1500 ms
+        case 41: return 700;  // Minions: Minion LoadTime 700 ms
+        case 42: return 700;  // Minion Horde: Minion LoadTime 700 ms
+        case 43: return 1100;  // Mega Minion: MegaMinion LoadTime 1100 ms
+        case 44: return 1200;  // Baby Dragon: BabyDragon LoadTime 1200 ms
+        case 45: return 1800;  // Balloon: Balloon LoadTime 1800 ms
+        case 46: return 1000;  // Dark Prince: DarkPrince LoadTime 1000 ms
+        case 47: return 1200;  // Royal Ghost: Ghost LoadTime 1200 ms
+        case 48: return 1200;  // Mega Knight: MegaKnight LoadTime 1200 ms
+        case 49: return 1600;  // Battle Healer: BattleHealer LoadTime 1600 ms
+        case 50: return 600;  // Bandit: Assassin LoadTime 600 ms
+        case 51: return 400;  // Berserker: Berserker LoadTime 400 ms
+        case 52: return 800;  // Miner: Miner LoadTime 800 ms
+        case 53: return 1200;  // Fisherman: Fisherman LoadTime 1200 ms
+        case 54: return 900;  // Ronin: Ronin LoadTime 900 ms
+        case 55: return 700;  // Goblin Machine: GoblinMachine LoadTime 700 ms
+        case 56: return -1;  // Inferno Dragon: InfernoDragon LoadTime 1200 ms
+        case 57: return 1600;  // Electro Dragon: ElectroDragon LoadTime 1600 ms
+        case 58: return 550;  // Night Witch: DarkWitch LoadTime 550 ms
+        case 59: return 400;  // Phoenix: Phoenix LoadTime 400 ms
+        case 60: return 3000;  // Sparky: ZapMachine LoadTime 3000 ms
+        case 61: return 2700;  // Princess: Princess LoadTime 2700 ms
+        case 62: return 1500;  // Hunter: Hunter LoadTime 1500 ms
+        case 63: return 400;  // Magic Archer: EliteArcher LoadTime 400 ms
+        case 64: return 2350;  // Firecracker: Firecracker LoadTime 2350 ms
+        case 65: return 1600;  // Skeleton Dragons: SkeletonDragon LoadTime 1600 ms
+        case 66: return 600;  // Goblin Demolisher: GoblinDemolisher LoadTime 600 ms
+        case 67: return 600;  // Flying Machine: DartBarrell LoadTime 600 ms
+        case 68: return 700;  // Mother Witch: WitchMother LoadTime 700 ms
+        case 69: return 400;  // Cannon Cart: MovingCannon LoadTime 400 ms
+        case 70: return 1200;  // Furnace: Furnace_rework LoadTime 1200 ms
+        case 71: return 400;  // Witch: Witch LoadTime 400 ms
+        case 72: return 100;  // Ice Spirit: IceSpirits LoadTime 100 ms
+        case 73: return 100;  // Fire Spirit: FireSpirits LoadTime 100 ms
+        case 74: return 100;  // Heal Spirit: HealSpirit LoadTime 100 ms
+        case 75: return 100;  // Electro Spirit: ElectroSpirit LoadTime 100 ms
+        case 76: return 500;  // Guards: SkeletonWarrior LoadTime 500 ms
+        case 77: return 800;  // Royal Recruits: Recruit LoadTime 800 ms
+        case 78: return 600;  // Bats: Bat LoadTime 600 ms
+        case 79: return 1500;  // Zappies: MiniZapMachine LoadTime 1500 ms
+        case 80: return 700;  // Three Musketeers: ThreeMusketeer_Rework LoadTime 700 ms
+        case 81: return 350;  // Battle Ram: BattleRam LoadTime 350 ms
+        case 82: return 800;  // Royal Hogs: RoyalHog LoadTime 800 ms
+        case 83: return 1000;  // Wall Breakers: Wallbreaker LoadTime 1000 ms
+        case 84: return 800;  // Electro Giant: ElectroGiant LoadTime 800 ms
+        case 85: return -1;  // Suspicious Bush: SuspiciousBush LoadTime 300 ms
+        case 86: return 1000;  // Rune Giant: GiantBuffer LoadTime 1000 ms
+        case 87: return 1100;  // Ram Rider: Ram LoadTime 1100 ms
+        case 88: return 700;  // Goblin Giant: GoblinGiant LoadTime 700 ms
+        case 89: return -1;  // Skeleton Barrel: SkeletonBalloon LoadTime 200 ms
+        case 90: return 300;  // Elixir Golem: ElixirGolem1 LoadTime 300 ms
+        case 91: return 500;  // Lava Hound: LavaHound LoadTime 500 ms
+        case 92: return 0;  // X-Bow: Xbow LoadTime 0 ms
+        case 93: return 3700;  // Mortar: Mortar LoadTime 3700 ms
+        case 94: return -1;  // Barbarian Hut: BarbarianHut LoadTime 0 ms
+        case 95: return -1;  // Goblin Hut: GoblinHut_Rework LoadTime 0 ms
+        case 96: return -1;  // Tombstone: Tombstone LoadTime 0 ms
+        case 97: return -1;  // Goblin Cage: GoblinCage LoadTime 0 ms
+        case 98: return -1;  // Goblin Drill: GoblinDrill LoadTime 200 ms
+        case 99: return -1;  // Elixir Collector: ElixirCollector LoadTime 0 ms
+        case 112: return 500;  // Goblin Gang: Goblin_Stab LoadTime 500 ms
+        case 113: return 1100;  // Rascals: RascalBoy LoadTime 1100 ms
+        case 115: return -1;  // Mighty Miner: MightyMiner LoadTime 700 ms
+        case 116: return 700;  // Golden Knight: GoldenKnight LoadTime 700 ms
+        case 117: return 1300;  // Skeleton King: SkeletonKing LoadTime 1300 ms
+        case 118: return 900;  // Archer Queen: ArcherQueen LoadTime 900 ms
+        case 119: return 600;  // Monk: Monk LoadTime 600 ms
+        case 120: return 800;  // Little Prince: LittlePrince LoadTime 800 ms
+        case 121: return 700;  // Goblinstein: goblinstein LoadTime 700 ms
+        case 122: return 700;  // Boss Bandit: BossBandit LoadTime 700 ms
+        case 123: return 1000;  // Wall Breakers: Wallbreaker LoadTime 1000 ms
+        case 125: return 600;  // Skeletons: Skeleton LoadTime 600 ms
+        case 126: return 600;  // Bats: Bat LoadTime 600 ms
+        case 127: return 1600;  // Bomber: Bomber LoadTime 1600 ms
+        case 128: return 400;  // Archers: Archer LoadTime 400 ms
+        case 129: return 100;  // Cannon: Cannon LoadTime 100 ms
+        case 130: return 2350;  // Firecracker: Firecracker LoadTime 2350 ms
+        case 131: return 450;  // Dart Goblin: BlowdartGoblin LoadTime 450 ms
+        case 133: return 600;  // Skeleton Army: Skeleton LoadTime 600 ms
+        case 134: return -1;  // Skeleton Barrel: SkeletonBalloon LoadTime 200 ms
+        case 135: return 700;  // Knight: Knight LoadTime 700 ms
+        case 136: return 1200;  // Royal Ghost: Ghost LoadTime 1200 ms
+        case 137: return 1200;  // Baby Dragon: BabyDragon LoadTime 1200 ms
+        case 138: return 1200;  // Furnace: Furnace_rework LoadTime 1200 ms
+        case 139: return -1;  // Goblin Cage: GoblinCage LoadTime 0 ms
+        case 140: return 300;  // Musketeer: Musketeer LoadTime 300 ms
+        case 141: return 900;  // Wizard: Wizard LoadTime 900 ms
+        case 142: return 400;  // Witch: Witch LoadTime 400 ms
+        case 143: return 900;  // Royal Giant: RoyalGiant LoadTime 900 ms
+        case 144: return 100;  // Ice Spirit: IceSpirits LoadTime 100 ms
+        case 145: return 2700;  // Princess: Princess LoadTime 2700 ms
+        case 146: return 1500;  // Hunter: Hunter LoadTime 1500 ms
+        case 147: return 1400;  // Valkyrie: Valkyrie LoadTime 1400 ms
+        case 148: return 1300;  // P.E.K.K.A.: Pekka LoadTime 1300 ms
+        case 149: return 700;  // Minion Horde: Minion LoadTime 700 ms
+        case 150: return 800;  // Royal Recruits: Recruit LoadTime 800 ms
+        case 151: return 1600;  // Electro Dragon: ElectroDragon LoadTime 1600 ms
+        case 152: return 3700;  // Mortar: Mortar LoadTime 3700 ms
+        case 153: return -1;  // Goblin Drill: GoblinDrill LoadTime 200 ms
+        case 154: return 700;  // Tesla: Tesla LoadTime 700 ms
+        case 155: return 1000;  // Barbarians: Barbarian LoadTime 1000 ms
+        case 156: return 400;  // Lumberjack: RageBarbarian LoadTime 400 ms
+        case 157: return 400;  // Executioner: AxeMan LoadTime 400 ms
+        case 159: return 700;  // Goblin Giant: GoblinGiant LoadTime 700 ms
+        case 160: return 1200;  // Mega Knight: MegaKnight LoadTime 1200 ms
+        case 161: return 350;  // Battle Ram: BattleRam LoadTime 350 ms
+        case 162: return 800;  // Royal Hogs: RoyalHog LoadTime 800 ms
+        case 163: return -1;  // Inferno Dragon: InfernoDragon LoadTime 1200 ms
+        case 165: return 800;  // Spirit Empress: MergeMaiden_Normal LoadTime 800 ms
+        case 166: return 700;  // Hero Knight: Knight LoadTime 700 ms
+        case 167: return 900;  // Hero Wizard: Wizard LoadTime 900 ms
+        case 168: return 300;  // Hero Musketeer: Musketeer LoadTime 300 ms
+        case 169: return 1000;  // Hero Giant: Giant LoadTime 1000 ms
+        case 170: return 1100;  // Hero Mini P.E.K.K.A.: MiniPekka LoadTime 1100 ms
+        case 171: return 400;  // Hero Magic Archer: EliteArcher LoadTime 400 ms
+        case 172: return 500;  // Hero Goblins: Goblin_Stab LoadTime 500 ms
+        case 173: return 1100;  // Hero Mega Minion: MegaMinion LoadTime 1100 ms
+        case 175: return 1500;  // Hero Ice Golem: IceGolemite LoadTime 1500 ms
+        default: return -1;
+    }
+}
+
+// The same for a spawned body, by the playable card of the same name. -1 = no such card.
+inline int loadMsForUnitName(const std::string& name) {
+    if (name == "Archer Queen") return 900;
+    if (name == "Archers") return 400;
+    if (name == "Baby Dragon") return 1200;
+    if (name == "Balloon") return 1800;
+    if (name == "Bandit") return 600;
+    if (name == "Barbarian Hut") return -1;
+    if (name == "Barbarians") return 1000;
+    if (name == "Bats") return 600;
+    if (name == "Battle Healer") return 1600;
+    if (name == "Battle Ram") return 350;
+    if (name == "Berserker") return 400;
+    if (name == "Bomb Tower") return 1300;
+    if (name == "Bomber") return 1600;
+    if (name == "Boss Bandit") return 700;
+    if (name == "Bowler") return 2000;
+    if (name == "Cannon") return 100;
+    if (name == "Cannon Cart") return 400;
+    if (name == "Dark Prince") return 1000;
+    if (name == "Dart Goblin") return 450;
+    if (name == "Electro Dragon") return 1600;
+    if (name == "Electro Giant") return 800;
+    if (name == "Electro Spirit") return 100;
+    if (name == "Electro Wizard") return 1200;
+    if (name == "Elite Barbarians") return 900;
+    if (name == "Elixir Collector") return -1;
+    if (name == "Elixir Golem") return 300;
+    if (name == "Executioner") return 400;
+    if (name == "Fire Spirit") return 100;
+    if (name == "Firecracker") return 2350;
+    if (name == "Fisherman") return 1200;
+    if (name == "Flying Machine") return 600;
+    if (name == "Furnace") return 1200;
+    if (name == "Giant") return 1000;
+    if (name == "Giant Skeleton") return 1000;
+    if (name == "Goblin Cage") return -1;
+    if (name == "Goblin Demolisher") return 600;
+    if (name == "Goblin Drill") return -1;
+    if (name == "Goblin Gang") return 500;
+    if (name == "Goblin Giant") return 700;
+    if (name == "Goblin Hut") return -1;
+    if (name == "Goblin Machine") return 700;
+    if (name == "Goblins") return 500;
+    if (name == "Goblinstein") return 700;
+    if (name == "Golden Knight") return 700;
+    if (name == "Golem") return 1500;
+    if (name == "Guards") return 500;
+    if (name == "Heal Spirit") return 100;
+    if (name == "Hog Rider") return 1000;
+    if (name == "Hunter") return 1500;
+    if (name == "Ice Golem") return 1500;
+    if (name == "Ice Spirit") return 100;
+    if (name == "Ice Wizard") return 1200;
+    if (name == "Inferno Dragon") return -1;
+    if (name == "Inferno Tower") return -1;
+    if (name == "Knight") return 700;
+    if (name == "Lava Hound") return 500;
+    if (name == "Little Prince") return 800;
+    if (name == "Lumberjack") return 400;
+    if (name == "Magic Archer") return 400;
+    if (name == "Mega Knight") return 1200;
+    if (name == "Mega Minion") return 1100;
+    if (name == "Mighty Miner") return -1;
+    if (name == "Miner") return 800;
+    if (name == "Mini PEKKA") return 1100;
+    if (name == "Minion Horde") return 700;
+    if (name == "Minions") return 700;
+    if (name == "Monk") return 600;
+    if (name == "Mortar") return 3700;
+    if (name == "Mother Witch") return 700;
+    if (name == "Musketeer") return 300;
+    if (name == "Night Witch") return 550;
+    if (name == "P.E.K.K.A.") return 1300;
+    if (name == "Phoenix") return 400;
+    if (name == "Prince") return 900;
+    if (name == "Princess") return 2700;
+    if (name == "Ram Rider") return 1100;
+    if (name == "Rascals") return 1100;
+    if (name == "Ronin") return 900;
+    if (name == "Royal Ghost") return 1200;
+    if (name == "Royal Giant") return 900;
+    if (name == "Royal Hogs") return 800;
+    if (name == "Royal Recruits") return 800;
+    if (name == "Rune Giant") return 1000;
+    if (name == "Skeleton Army") return 600;
+    if (name == "Skeleton Barrel") return -1;
+    if (name == "Skeleton Dragons") return 1600;
+    if (name == "Skeleton King") return 1300;
+    if (name == "Skeletons") return 600;
+    if (name == "Sparky") return 3000;
+    if (name == "Spear Goblins") return 1100;
+    if (name == "Spirit Empress") return 800;
+    if (name == "Suspicious Bush") return -1;
+    if (name == "Tesla") return 700;
+    if (name == "Three Musketeers") return 700;
+    if (name == "Tombstone") return -1;
+    if (name == "Valkyrie") return 1400;
+    if (name == "Wall Breakers") return 1000;
+    if (name == "Witch") return 400;
+    if (name == "Wizard") return 900;
+    if (name == "X-Bow") return 0;
+    if (name == "Zappies") return 1500;
+    return -1;
+}

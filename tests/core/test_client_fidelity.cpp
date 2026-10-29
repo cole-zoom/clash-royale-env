@@ -52,10 +52,14 @@ TEST_CASE("client values: projectiles, bodies, towers, King activation, crown-to
     REQUIRE(CLIENT_EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS == 2000);
 }
 
-TEST_CASE("target queueing: a new target that damage in flight will kill is passed over", "[client_mechanics][queueing]") {
+TEST_CASE("pending-damage skip (41fe8ad rule): a new target that damage in flight will kill is passed over",
+          "[client_mechanics][queueing]") {
+    // The rule as merged in 41fe8ad: every attacker, whenever the damage lands (Fidelity::pendingDamageClientRule
+    // off). The client's form (projectile attackers, within 600 ms) is pinned in test_client_cycle.cpp.
+    SwitchOff<&Fidelity::pendingDamageClientRule> oldRule;
     auto run = [](bool queueing) {
-        const bool was = Fidelity::targetQueueing;
-        Fidelity::targetQueueing = queueing;
+        const bool was = Fidelity::pendingDamageSkip;
+        Fidelity::pendingDamageSkip = queueing;
         Board board;
         auto shooter = std::make_shared<StationaryCombatant>(1, 5.0f, 5.0f, 1000, 0, 6.0f, 50, 10);
         auto doomed = std::make_shared<DummyEntity>(2, 5.0f, 8.0f, 80, 1);   // nearer, 80 hp
@@ -66,10 +70,10 @@ TEST_CASE("target queueing: a new target that damage in flight will kill is pass
         // an ally's shot already on its way to `doomed`, carrying 100 (more than its 80 hp)
         spawn(board, std::make_shared<Projectile>(10, 5.0f, 20.0f, 0, doomed, 0.1f, 100));
         shooter->update(board);
-        Fidelity::targetQueueing = was;
+        Fidelity::pendingDamageSkip = was;
         return shooter->lastTargetId;
     };
-    REQUIRE(run(true) == 3);    // USE_TARGET_QUEUEING: skips the doomed one
+    REQUIRE(run(true) == 3);    // skips the doomed one
     REQUIRE(run(false) == 2);   // before: the nearest, overkill
 }
 
@@ -144,6 +148,9 @@ TEST_CASE("a Cannon's shot flies (TowerCannonball 1000) instead of hitting at on
 }
 
 TEST_CASE("troops see crown towers 2 tiles further (EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS)", "[client_mechanics][sight]") {
+    // Under the fitted sight rule (centre to centre, troop bonus 1.75); the client's edge-to-edge rule with the same
+    // +2 is pinned in test_client_cycle.cpp.
+    NoClientTargeting fitted;
     auto run = [](bool bonus) {
         const bool was = Fidelity::crownTowerSightBonus;
         Fidelity::crownTowerSightBonus = bonus;

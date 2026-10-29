@@ -81,10 +81,11 @@ public:
     float bodyRadius = 0.0f;
     int mass = 0;
 
-    // Damage on its way to an entity, for target queueing (Fidelity::targetQueueing): a projectile in flight
-    // reports its target's id and damage; everything else -1 / 0.
+    // Damage on its way to an entity, for the pending-damage skip (Fidelity::pendingDamageSkip): a projectile in
+    // flight reports its target's id, its damage and how long until it lands (ms); everything else -1 / 0 / 0.
     virtual int incomingTargetId() const { return -1; }
     virtual int incomingDamage() const { return 0; }
+    virtual int incomingEtaMs() const { return 0; }
 
     // Footprint for target-selection distance only, never collision or attack
     // range. A Crown Tower's is larger than its body, since units close on its

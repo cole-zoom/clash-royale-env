@@ -119,6 +119,10 @@ struct SwitchOff {
 using NoClientProjectiles = SwitchOff<&Fidelity::clientProjectiles>;
 using NoClientBodies = SwitchOff<&Fidelity::clientBodies>;
 using NoKingActivationDelay = SwitchOff<&Fidelity::kingActivationDelay>;
-using NoTargetQueueing = SwitchOff<&Fidelity::targetQueueing>;
+using NoPendingDamageSkip = SwitchOff<&Fidelity::pendingDamageSkip>;
+using NoReloadFromAttackStart = SwitchOff<&Fidelity::reloadFromAttackStart>;
+using NoClientTargeting = SwitchOff<&Fidelity::clientTargeting>;
+using NoKingFirstShotDelay = SwitchOff<&Fidelity::kingFirstShotDelay>;
+using NoSpecialLoadTime = SwitchOff<&Fidelity::specialLoadTime>;
 using NoAoeWithoutTarget = SwitchOff<&Fidelity::aoeLandsWithoutTarget>;
 using NoCrownTowerSightBonus = SwitchOff<&Fidelity::crownTowerSightBonus>;
