@@ -917,6 +917,8 @@ TEST_CASE("Battle Ram breaks on its first hit on a building and releases its 2 B
             spawn(board, building);
             advancePastDeploy(ram, board);
             ram->update(board);
+            // the preload model's first hit: client HitSpeed 400 - LoadTime 350 = 1 tick
+            if (ram->isAlive()) ram->update(board);
 
             REQUIRE(building->hp == 5000 - 286);   // one uncharged hit: it never travelled
             REQUIRE_FALSE(ram->isAlive());
@@ -1590,7 +1592,11 @@ TEST_CASE("X-Bow can't fire until its slow initial deploy delay elapses", "[card
     REQUIRE(enemy->hp == 100000);
 
     xbow->update(board); // the 35th tick: ready to fire
+    // then the preload model's first hit: client X-Bow HitSpeed 300 - LoadTime 0 = 3 ticks (2026-10-29)
+    int extra = 0;
+    while (enemy->hp == 100000 && extra < 10) { xbow->update(board); ++extra; }
     REQUIRE(enemy->hp < 100000);
+    REQUIRE(extra == 4);  // acts from the 36th tick (its 3.5 s deploy), lands 3 ticks later
 }
 
 

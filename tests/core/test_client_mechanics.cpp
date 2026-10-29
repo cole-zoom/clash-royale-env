@@ -115,7 +115,8 @@ TEST_CASE("Firecracker: the shell bursts into 5 sparks of 64 that also hit a uni
     auto behind = dummyTarget(board, 9.0f, 10.0f, 1);   // 2 tiles past the target, on the shot's line
     auto aside = dummyTarget(board, 14.0f, 10.0f, 1);   // well off the fan
     spawnCard(board, 64, 9.0f, 3.0f, 0);
-    for (int t = 0; t < 60; ++t) tickBoard(board, t);  // one shot: deploy 10 + load 24, next at +30
+    // one shot: deploy 10, then the preload model's first hit (client 3000 - 2350 ms = 7 ticks), next at +30
+    for (int t = 0; t < 40; ++t) tickBoard(board, t);
     REQUIRE(100000 - target->hp == 5 * 64);
     REQUIRE(100000 - behind->hp == 5 * 64);
     REQUIRE(aside->hp == 100000);

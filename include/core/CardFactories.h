@@ -10,6 +10,7 @@
 #include "Building.h"
 #include "AreaSpell.h"
 #include <stdexcept>
+#include <algorithm>
 
 // One factory per Archetype (CardStats.h). Nothing here is specific to a card.
 namespace CardFactories {
@@ -29,6 +30,9 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     // spells and deploy effects do not, since a spell has its own delay.
     entity->deployTicksRemaining = stats.deployTicks;
     entity->loadTicks = loadTicksForCard(stats.id);
+    // A loaded unit's first hit (the preload model, CombatEntity::loadModel). A spawned body (negative id) takes
+    // the playable card of the same name's.
+    entity->firstHitTicks = (stats.id >= 0) ? firstHitTicksForCard(stats.id) : firstHitTicksForUnitName(stats.name);
     if (stats.archetype != Archetype::Spell) {
         const float ct = crownTowerFractionForCard(stats.id);
         if (ct >= 0.0f) entity->crownTowerFraction = ct;
@@ -123,6 +127,9 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     // multiplier) is not copied from stats.
     applyOnHit(entity, stats);
     if (stats.initialCooldownTicks > 0) entity->seedCooldown(stats.initialCooldownTicks);
+    // The client's LoadFirstHit (Sparky): spawns unloaded under the preload model (CombatEntity::loadModel).
+    if (loadFirstHitForCard(stats.id) && entity->usesPreload() && stats.initialCooldownTicks < entity->preloadReloadTicks())
+        entity->seedCooldown(entity->preloadReloadTicks());
     if (stats.passiveDamageReduction < 1.0f) entity->applyCurse(stats.passiveDamageReduction, 999999);
 }
 

@@ -118,6 +118,40 @@ public:
     int windupTargetId = -1;
     int windupTicksLeft = 0;
     static inline bool loadTimesEnabled = true;
+    // How the load time is used (2026-10-29, bot-77 sim fidelity):
+    //   LOAD_MODEL_PRELOAD (default): the game's model. A unit loads loadTicks
+    //     of its attack whenever it is not attacking (walking, deploying,
+    //     idle), so a loaded unit's hit lands attackCooldown - loadTicks
+    //     after it starts attacking; after a hit it reloads loadTicks, then
+    //     winds up again, so continuous hits stay attackCooldown apart.
+    //     Sources: the client's logic tables (LoadTime, HitSpeed per unit;
+    //     LoadFirstHit set only on Sparky); RoyaleAPI, "The Secret Stats"
+    //     (first hit = hit time - load time; Knight 1.2 - 0.7 = 0.5 s);
+    //     Supercell's balance notes ("first hit speed", Archers 0.1 -> 0.5 s
+    //     in April 2023 = 0.9 - 0.4). A hit that has started keeps its target
+    //     (globals LOGIC_PRESERVE_TARGET_IF_HIT_STARTED) unless the target
+    //     gets more than HIT_CANCEL_DISTANCE beyond reach
+    //     (LOGIC_CANCEL_HIT_FROM_LONG_DISTANCE_RANGE 1500). A stun cancels a
+    //     started hit and keeps the load (the cooldown is held, as before).
+    //     Cards whose load is not shorter than their hit speed (Inferno Tower
+    //     and Dragon, Mighty Miner: the load is their lock-on) keep the old
+    //     model. A card with no load entry (spawned bodies, towers) is
+    //     unchanged: no windup.
+    //   LOAD_MODEL_WINDUP_PER_TARGET: the engine before 2026-10-29, which
+    //     waited the full loadTicks on every new target.
+    static constexpr int LOAD_MODEL_WINDUP_PER_TARGET = 0;
+    static constexpr int LOAD_MODEL_PRELOAD = 1;
+    static inline int loadModel = LOAD_MODEL_PRELOAD;
+    static constexpr float HIT_CANCEL_DISTANCE = 1.5f;
+    // A loaded unit's first hit, in ticks: the client's HitSpeed - LoadTime
+    // (LoadTimes.h firstHitTicksForCard; -1 = none, the old model applies).
+    int firstHitTicks = -1;
+    bool usesPreload() const {
+        return loadTimesEnabled && loadModel == LOAD_MODEL_PRELOAD && firstHitTicks >= 0;
+    }
+    int preloadWindupTicks() const { return firstHitTicks; }
+    // After a hit: the rest of the attack cycle, reloading.
+    int preloadReloadTicks() const { return std::max(0, attackCooldown - firstHitTicks); }
 
     // Damage-over-time mark (Dart Goblin / Firecracker Evolutions; see
     // applyDot, PoisonOnHit). Ticks down independently of freeze and curse.
@@ -559,7 +593,10 @@ public:
             refreshFreezeView();
         }
         if (resetCooldownOnFreeze) {
-            currentCooldown = static_cast<float>(attackCooldown);
+            // Sparky: a stun empties her load (globals LOGIC_LOAD_FIRST_HIT_RESET_TIMER_WHEN_ZAPPED).
+            currentCooldown = static_cast<float>(usesPreload() ? preloadReloadTicks() : attackCooldown);
+            windupTargetId = -1;
+            windupTicksLeft = 0;
         }
     }
 
@@ -722,7 +759,11 @@ public:
         }
         if (!target) {
             target = wasFrozen ? nullptr : resolveCurrentTarget(board);
-            if (target && position.distanceTo(target->position) > effectiveRangeTo(target)) {
+            // A hit that has started keeps its target a little past reach
+            // (LOAD_MODEL_PRELOAD; see loadModel).
+            const float keep = (usesPreload() && target && windupTargetId == target->id && windupTicksLeft > 0)
+                ? HIT_CANCEL_DISTANCE : 0.0f;
+            if (target && position.distanceTo(target->position) > effectiveRangeTo(target) + keep) {
                 target = nullptr;
             }
             if (!target) {
@@ -749,11 +790,35 @@ public:
             float dist = position.distanceTo(target->position);
             float effectiveAttackRange = effectiveRangeTo(target);
 
-            if (dist <= effectiveAttackRange) {
-                // The first-hit windup (loadTicks): starts when the unit is in
-                // range of a target it has not wound up on; a stun restarts it.
+            const bool hitStarted = usesPreload() && windupTargetId == target->id && windupTicksLeft > 0;
+            if (dist <= effectiveAttackRange || (hitStarted && dist <= effectiveAttackRange + HIT_CANCEL_DISTANCE)) {
                 bool windingUp = false;
-                if (loadTimesEnabled && loadTicks > 0) {
+                if (usesPreload()) {
+                    // LOAD_MODEL_PRELOAD: an attack starts once loaded (cooldown
+                    // 0) and in reach, and lands preloadWindupTicks() later.
+                    if (stunned) {
+                        windupTargetId = -1;
+                        windupTicksLeft = 0;
+                    } else {
+                        if (windupTargetId == target->id && windupTicksLeft > 0) {
+                            // lands on the tick the windup runs out
+                            windupTicksLeft--;
+                            windingUp = windupTicksLeft > 0;
+                        } else if (currentCooldown == 0.0f) {
+                            // loaded and in reach: the attack starts now (a
+                            // zero windup lands this tick)
+                            windupTargetId = target->id;
+                            windupTicksLeft = preloadWindupTicks();
+                            windingUp = windupTicksLeft > 0;
+                        } else {
+                            windupTargetId = -1;
+                            windingUp = true;  // still reloading
+                        }
+                    }
+                } else if (loadTimesEnabled && loadTicks > 0) {
+                    // LOAD_MODEL_WINDUP_PER_TARGET (and the lock-on cards): a
+                    // unit in range of a target it has not wound up on waits
+                    // loadTicks; a stun restarts it.
                     if (stunned) {
                         windupTargetId = -1;
                     } else if (windupTargetId != target->id) {
@@ -802,7 +867,8 @@ public:
                         }
                         attackSequenceIndex = (attackSequenceIndex + 1) % n;
                     }
-                    currentCooldown = static_cast<float>(attackCooldown);
+                    // LOAD_MODEL_PRELOAD: reload, then the next windup.
+                    currentCooldown = static_cast<float>(usesPreload() ? preloadReloadTicks() : attackCooldown);
                     if (chargeThreshold > 0.0f) {
                         if (chargeIsSticky && chargeProgress >= chargeThreshold) chargeHasStuck = true;
                         if (!chargeHasStuck) chargeProgress = 0.0f;
@@ -883,6 +949,7 @@ public:
                 pullToward(*target, position, dist - effectiveAttackRange + 0.1f);
                 currentCooldown = static_cast<float>(attackCooldown);
             } else {
+                if (usesPreload()) { windupTargetId = -1; windupTicksLeft = 0; }  // out of reach: no hit in progress
                 Vector2D beforeMove = position;
                 // Lane-aware approach: a King objective is walked to up this
                 // unit's own lane; any other target is its own position

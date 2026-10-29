@@ -94,6 +94,14 @@ private:
         // After applyCardMetadata, which would otherwise overwrite name and
         // cardId with the CardStats defaults.
         CardFactories::applyCardMetadata(tower, stats);
+        // A tower is not a card: CardStats' default id 0 is the Knight's, whose load time
+        // applyCardMetadata would otherwise give every Princess Tower (2026-10-24 to 2026-10-29: a
+        // 0.7 s windup on every new target). Towers attack on their cooldown alone.
+        tower->loadTicks = 0;
+        tower->firstHitTicks = -1;
+        // ...and no deploy second either: applyCardMetadata gives every Princess Tower the card deploy time, so
+        // both stood inert for the first 1.0 s after reset() (the King, built by the other overload, did not).
+        tower->deployTicksRemaining = 0;
         tower->name = towerName;
         tower->cardId = TOWER_PRINCESS_ID;
         board.addEntity(tower);

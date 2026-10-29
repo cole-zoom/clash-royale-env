@@ -289,9 +289,12 @@ TEST_CASE("the Cannon fully answers a lone Hog Rider", "[deck_qa][defence]") {
 
     INFO("unanswered " << unanswered << " hp lost, with a Cannon " << withCannon);
     REQUIRE(withCannon < unanswered);
-    // The Cannon absorbs the overwhelming majority of the push: the Hog, Very
-    // Fast in the real game, reaches the tower for one hit before it dies.
-    REQUIRE(withCannon * 5 < unanswered);
+    // The Cannon absorbs the overwhelming majority of the push. Since
+    // 2026-10-29 (the preload model) the Cannon's first shot comes 0.9 s after
+    // it acquires the Hog (client HitSpeed 1000 - LoadTime 100), so a Cannon
+    // dropped this late lets the Hog land two swings (634), not one; was * 5.
+    // UNCONFIRMED against the real game: a question for Cole.
+    REQUIRE(withCannon * 3 < unanswered);
 }
 
 TEST_CASE("Skeletons and a Musketeer both blunt a Hog, a Hog does not",

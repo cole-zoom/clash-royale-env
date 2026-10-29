@@ -341,8 +341,10 @@ TEST_CASE("Evolved Furnace spawns every 2.4 s only while attacking, to alternati
         auto f = m.spawnCard(EVO_FURNACE, 8.5f, 6.0f, 0, true).front();
         m.dummy(8.5f, 10.5f, 1, 100000000); // in its 5.5 range from the start
         auto log = spiritSpawns(m, f, 110);
-        // First attack on tick 11; hot from tick 12, which pulls the timer in.
-        REQUIRE(log.ticks == std::vector<int>{ 35, 59, 83, 107 });
+        // First attack on tick 16 (deploy 10, then the preload model's first hit:
+        // the client's Furnace 1700 - 1200 ms = 5 ticks; was tick 11 before
+        // 2026-10-29); hot from then, which pulls the timer in.
+        REQUIRE(log.ticks == std::vector<int>{ 40, 64, 88 });
         REQUIRE(log.dx[0] == Catch::Approx(-1.0f).margin(0.05f)); // team 0: left is -x
         REQUIRE(log.dx[1] == Catch::Approx(1.0f).margin(0.05f));
         REQUIRE(log.dx[2] == Catch::Approx(-1.0f).margin(0.05f));

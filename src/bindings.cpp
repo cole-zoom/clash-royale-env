@@ -257,6 +257,10 @@ PYBIND11_MODULE(clash_royale_env, m) {
     // First-hit delays (CombatEntity::loadTimesEnabled, LoadTimes.h): default true.
     m.def("set_load_times", [](bool on) { CombatEntity::loadTimesEnabled = on; }, py::arg("on"));
     m.def("get_load_times", []() { return CombatEntity::loadTimesEnabled; });
+    // 0 = the full load time on every new target (the engine before 2026-10-29), 1 = the game's preload model
+    // (first hit = hit speed - load time; CombatEntity::loadModel).
+    m.def("set_load_model", [](int model) { CombatEntity::loadModel = model; }, py::arg("model"));
+    m.def("get_load_model", []() { return CombatEntity::loadModel; });
     m.def("get_all_card_ids", &getAllCardIds,
         "All ids CardRegistry currently has registered (real, playable cards only).");
 
