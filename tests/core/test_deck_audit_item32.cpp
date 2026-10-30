@@ -551,7 +551,9 @@ TEST_CASE("Goblin Hut is 1180 hp and its Spear Goblins shoot air, every 1.6 s",
     REQUIRE(goblin);
     REQUIRE(goblin->targetsAir);
     REQUIRE(goblin->getAttackCooldown() == secs(1.6));
-    REQUIRE(goblin->deployTicksRemaining == secs(0.5)); // 0.5 s, not the default 1 s (August 2025)
+    // 0.5 s, not the default 1 s (August 2025); the step it spawned in may already have run one of its ticks
+    REQUIRE(goblin->deployTicksRemaining <= secs(0.5));
+    REQUIRE(goblin->deployTicksRemaining >= secs(0.5) - (TICKS_PER_STEP - 1));
     m.step(100);
     REQUIRE(flyer->hp < 1000000); // was untouched: the Hut's goblins could not target air
 }

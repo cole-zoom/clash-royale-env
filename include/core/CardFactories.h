@@ -97,7 +97,8 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     entity->revealTicksAfterAttack = stats.revealTicksAfterAttack;
     entity->periodicEffect = stats.periodicEffect;
     entity->periodicIntervalTicks = stats.periodicIntervalTicks;
-    entity->periodicTicksUntilNext = stats.periodicIntervalTicks; // first fire after one full interval
+    // first fire after one full interval; a gated one (Goblin Hut) gets its first chance as its deploy ends
+    entity->periodicTicksUntilNext = (stats.periodicEffect && stats.periodicEffect->gated()) ? 0 : stats.periodicIntervalTicks;
     entity->periodicHotIntervalTicks = stats.periodicHotIntervalTicks;
     entity->periodicSideOffset = stats.periodicSideOffset;
     entity->auraRadius = stats.auraRadius;

@@ -792,8 +792,11 @@ public:
                 periodicTicksUntilNext = periodicHotIntervalTicks;
             }
             periodicTicksUntilNext--;
-            if (periodicTicksUntilNext <= 0) {
-                if (periodicEffect) periodicEffect->apply(board, periodicSpawnPoint(board), team);
+            if (periodicTicksUntilNext <= 0 && periodicEffect && !periodicEffect->open(board, *this)) {
+                periodicTicksUntilNext = 0; // asleep (Goblin Hut): fires the tick an enemy comes in range
+            } else if (periodicTicksUntilNext <= 0) {
+                if (periodicEffect && periodicEffect->gated()) periodicEffect->fire(board, *this);
+                else if (periodicEffect) periodicEffect->apply(board, periodicSpawnPoint(board), team);
                 periodicSpawnCount++;
                 periodicTicksUntilNext = hot ? periodicHotIntervalTicks : periodicIntervalTicks;
             }

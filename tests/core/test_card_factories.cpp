@@ -378,38 +378,37 @@ TEST_CASE("CursedHogOnHit composes with an existing deathEffect instead of overw
 
 // ---------------- proximity-gated periodic spawn (Goblin Hut) ----------------
 
-TEST_CASE("ProximityGatedPeriodicSpawnEffect spawns when an enemy is within range", "[card_factories][periodic]") {
+TEST_CASE("ProximityGatedPeriodicSpawnEffect opens when an enemy is within range", "[card_factories][periodic]") {
     Board board;
+    auto self = std::make_shared<DummyEntity>(2, 0.0f, 0.0f, 100, 0); // the Hut's stand-in, at the origin
     auto enemy = std::make_shared<DummyEntity>(1, 1.0f, 0.0f, 100, 1); // dist 1.0
     spawn(board, enemy);
 
     ProximityGatedPeriodicSpawnEffect effect(makeTroopStats(), 6.0f);
+    REQUIRE(effect.gated());
+    REQUIRE(effect.open(board, *self));
     effect.apply(board, Vector2D{ 0.0f, 0.0f }, 0);
     board.commitPendingEntities();
 
     REQUIRE(board.getEntities().size() == 2); // the enemy, plus the spawned child
 }
 
-TEST_CASE("ProximityGatedPeriodicSpawnEffect stays quiet with no enemy in range", "[card_factories][periodic]") {
+TEST_CASE("ProximityGatedPeriodicSpawnEffect stays shut with no enemy in range", "[card_factories][periodic]") {
     Board board;
+    auto self = std::make_shared<DummyEntity>(2, 0.0f, 0.0f, 100, 0); // the Hut's stand-in, at the origin
     auto farEnemy = std::make_shared<DummyEntity>(1, 100.0f, 0.0f, 100, 1); // way outside 6.0
     spawn(board, farEnemy);
 
     ProximityGatedPeriodicSpawnEffect effect(makeTroopStats(), 6.0f);
-    effect.apply(board, Vector2D{ 0.0f, 0.0f }, 0);
-    board.commitPendingEntities();
-
-    REQUIRE(board.getEntities().size() == 1); // no spawn -- only the original enemy
+    REQUIRE_FALSE(effect.open(board, *self));
 }
 
 TEST_CASE("ProximityGatedPeriodicSpawnEffect ignores allies when checking for a nearby enemy", "[card_factories][periodic]") {
     Board board;
+    auto self = std::make_shared<DummyEntity>(2, 0.0f, 0.0f, 100, 0); // the Hut's stand-in, at the origin
     auto ally = std::make_shared<DummyEntity>(1, 1.0f, 0.0f, 100, 0); // same team, dist 1.0
     spawn(board, ally);
 
     ProximityGatedPeriodicSpawnEffect effect(makeTroopStats(), 6.0f);
-    effect.apply(board, Vector2D{ 0.0f, 0.0f }, 0);
-    board.commitPendingEntities();
-
-    REQUIRE(board.getEntities().size() == 1); // no spawn -- the nearby unit is an ally, not an enemy
+    REQUIRE_FALSE(effect.open(board, *self)); // the nearby unit is an ally, not an enemy
 }
