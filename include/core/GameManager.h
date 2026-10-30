@@ -757,8 +757,19 @@ public:
         trackSlotEntities(1, 0, /*lateSpawnsOnly=*/true);
         board.commitPendingEntities(currentTick);
 
-        for (auto& entity : board.getEntities()) {
-            if (entity->isAlive()) entity->update(board);
+        // Fidelity::clientCollision: each body pushes itself before its own update, and keeps half its move for
+        // the tick's second 50 ms pass (Board::finishClientPushTick).
+        const bool clientPush = Fidelity::clientCollision;
+        if (clientPush) board.beginClientPushTick();
+        const auto& entities = board.getEntities();
+        for (size_t i = 0; i < entities.size(); ++i) {
+            const auto& entity = entities[i];
+            if (!entity->isAlive()) continue;
+            if (!clientPush) { entity->update(board); continue; }
+            board.clientSelfPush(*entity);
+            const Vector2D before = entity->position;
+            entity->update(board);
+            board.holdHalfStep(i, before);
         }
 
         // Elixir Collector: drain this tick's grants into the players, with the
@@ -771,7 +782,8 @@ public:
         trackSlotEntities(0, 0, /*lateSpawnsOnly=*/true);
         trackSlotEntities(1, 0, /*lateSpawnsOnly=*/true);
         board.commitPendingEntities(currentTick);
-        board.resolveCollisions();
+        if (clientPush) board.finishClientPushTick();
+        else board.resolveCollisions();
 
         // evaluateAtTick: from 3:00 a crown lead, or the first crown in
         // overtime, ends the match.

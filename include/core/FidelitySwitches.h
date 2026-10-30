@@ -69,4 +69,15 @@ struct Fidelity {
     // instead of 0.035 a tick (2.857 s). OFF by default: perception's opponent-elixir tracker assumes the engine's
     // rate; for Cole to decide.
     static inline bool clientElixirRate = false;
+
+    // ---- Unit collision as the client's code runs it (separation 0x71fff6058c, move step 0x71fff60bd4; notes §5) ----
+    // Each troop pushes only itself, in entity order, before its own step, and the next troop sees where it went.
+    // Per neighbour on its layer: overlap clamped to 0.3, times the neighbour's Mass / its own (capped 0.299), + 0.001;
+    // averaged over contacts and capped at 0.15 a 50 ms tick, two passes a 100 ms tick with the step split between
+    // them (Board::clientSelfPush). Units deploying, dashing, winding up a special, or jumping the river (JumpEnabled
+    // troops over river cells, at JumpSpeed) neither push nor are pushed. A push may carry a centre into the first
+    // river cell, where moves clamp per cell and a 0.256 nudge a tick takes it back to the bank (Board::clientRiverMove).
+    // Buildings keep the engine's static push-out. OFF by default: off = Board::resolveCollisions (pairwise split
+    // m2 / (m1 + m2) after every unit has moved, uncapped, with a sideways nudge; the bank snap).
+    static inline bool clientCollision = false;
 };

@@ -384,6 +384,11 @@ public:
     // Dash invulnerability (Bandit). With no separate dash state, immune once
     // past half the charge distance: a longer window than the real ~0.8 s.
     bool chargeGrantsInvulnerability = false;
+    // Mid-dash (Bandit): the invulnerable second half of the charge. Also when the unit leaves body collision
+    // (Fidelity::clientCollision: the client's dash state 3 neither pushes nor is pushed).
+    bool isDashing() const {
+        return chargeGrantsInvulnerability && chargeThreshold > 0.0f && chargeProgress >= chargeThreshold * 0.5f;
+    }
 
     // A stun resets, not just slows, the attack cooldown (Sparky restarts her
     // wind-up after a Zap).
@@ -573,8 +578,7 @@ public:
     // Parry is checked before shield, so a parried hit costs no shield. The
     // shield absorbs first and only the excess reaches hp.
     void takeDamage(int amount) override {
-        if (chargeGrantsInvulnerability && chargeThreshold > 0.0f
-            && chargeProgress >= chargeThreshold * 0.5f) {
+        if (isDashing()) {
             return; // mid-dash: immune
         }
         if (curseTicksRemaining > 0) {

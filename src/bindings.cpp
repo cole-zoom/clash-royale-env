@@ -297,6 +297,7 @@ PYBIND11_MODULE(clash_royale_env, m) {
     CRE_FIDELITY_SWITCH("king_first_shot_delay", kingFirstShotDelay)
     CRE_FIDELITY_SWITCH("princess_first_shot_delay", princessFirstShotDelay)
     CRE_FIDELITY_SWITCH("client_elixir_rate", clientElixirRate)
+    CRE_FIDELITY_SWITCH("client_collision", clientCollision)
 #undef CRE_FIDELITY_SWITCH
     m.def("get_all_card_ids", &getAllCardIds,
         "All ids CardRegistry currently has registered (real, playable cards only).");

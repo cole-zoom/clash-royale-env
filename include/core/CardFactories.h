@@ -23,6 +23,16 @@ inline void applyOnHit(const std::shared_ptr<CombatEntity>& entity, const CardSt
 }
 
 // Copies a card's per-entity configuration onto each entity it produces.
+// The client's JumpEnabled troops and their JumpSpeed (characters/*.toml: hogrider, royalhog, ram_rider's Ram,
+// prince, dark_prince; all 160, in Speed's units), used under Fidelity::clientCollision. Not in the generated
+// ClientMechanics.h. Evolutions and Heroes carry their base card's name. -1 = not JumpEnabled (the engine's other
+// riverIgnores troops, e.g. Royal Ghost, Mega Knight, Bandit, keep walking the river).
+inline int clientJumpSpeedForUnitName(const std::string& name) {
+    if (name == "Hog Rider" || name == "Royal Hogs" || name == "Ram Rider" || name == "Prince" || name == "Dark Prince")
+        return 160;
+    return -1;
+}
+
 inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const CardStats& stats) {
     entity->name = stats.name;
     entity->cardId = stats.id;
@@ -56,6 +66,8 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
         entity->bodyRadius = (rad > 0) ? rad / 1000.0f : 0.0f;
         const int m = byId ? clientMassForCard(stats.id) : clientMassForUnitName(stats.name);
         entity->mass = (m > 0) ? m : 0;
+        const int jump = clientJumpSpeedForUnitName(stats.name);
+        entity->jumpSpeed = (jump > 0) ? jump * REAL_TILES_PER_MIN_TO_ENGINE * MOVEMENT_SPEED_SCALE : 0.0f;
     }
     if (stats.archetype != Archetype::Spell) {
         const float ct = crownTowerFractionForCard(stats.id);

@@ -40,6 +40,9 @@ private:
     mutable std::vector<Body> bodyScratch;
     mutable std::vector<Collider> colliderCache;
     mutable bool collidersDirty = true;
+    // Fidelity::clientCollision: the half of each entity's step held back for the tick's second 50 ms pass, by
+    // index into activeEntities (beginClientPushTick .. finishClientPushTick).
+    std::vector<Vector2D> clientHalfSteps;
 
     // The arena is 18x34: one row behind each King is dead space except a
     // centred opening of real ground (isBackRowDeadZone).
@@ -348,6 +351,130 @@ public:
             if (entity->isAlive()) {
                 entity->clampPosition(*this);
             }
+        }
+    }
+
+    // ---- Fidelity::clientCollision: the client's body pushing (bot-77 docs/client-code-notes.md §5) ----
+    // Separation 0x71fff6058c and move step 0x71fff60bd4, one logic tick = 50 ms; lengths in tiles (client 1/1000).
+    static constexpr float CLIENT_MAX_OVERLAP = 0.3f;     // overlap counted per neighbour, at most
+    static constexpr float CLIENT_MAX_SHARE = 0.299f;     // overlap x Mass ratio, at most
+    static constexpr float CLIENT_MIN_PUSH = 0.001f;      // added to every contact's push
+    static constexpr float CLIENT_CONTACT_SKIN = 0.02f;   // bodies this close count as contacts
+    static constexpr float CLIENT_MAX_PUSH = 0.15f;       // the averaged push, per 50 ms
+    static constexpr float CLIENT_RIVER_CELL = 0.5f;      // tilemap cell (36 x 64 over the arena)
+    static constexpr float CLIENT_RIVER_NUDGE = 0.256f;   // toward the nearer bank, per 50 ms, while pushed in a river cell
+
+    // A river tilemap cell: the river band, off the bridges. Cells are CLIENT_RIVER_CELL squares on the board's
+    // half-tile grid (the band [15.5, 17.5) is four rows of them); a cell is a bridge cell if its centre is on a
+    // bridge (isOnBridge, so the bridges stay where the engine has them).
+    bool isRiverCellAt(float x, float y) const {
+        if (!(y > riverY_start && y < riverY_end)) return false;
+        const float cellCentreX = (std::floor(x / CLIENT_RIVER_CELL) + 0.5f) * CLIENT_RIVER_CELL;
+        return !isOnBridge(cellCentreX);
+    }
+
+    // The client's terrain move (0x720017de58) for a body the river stops. From a dry cell the move is not clamped
+    // (a push can carry the centre into the first river cell). From a river cell it is clamped per axis at the cell
+    // border, x then y: it cannot enter another river cell, the other axis keeps moving (a slide); dry cells are
+    // open. `pushed`: the move carries a body push, which adds the nudge toward the nearer bank (by map half), inside
+    // the clamped move.
+    Vector2D clientRiverMove(const Vector2D& from, Vector2D to, bool pushed) const {
+        if (!isRiverCellAt(from.x, from.y)) return to;
+        const float riverMid = (riverY_start + riverY_end) / 2.0f;
+        if (pushed) to.y += (from.y < riverMid) ? -CLIENT_RIVER_NUDGE : CLIENT_RIVER_NUDGE;
+        constexpr float EDGE = 1e-4f;   // just inside the border
+        const float cx = std::floor(from.x / CLIENT_RIVER_CELL);
+        const float cy = std::floor(from.y / CLIENT_RIVER_CELL);
+        float x = to.x;
+        if (std::floor(x / CLIENT_RIVER_CELL) != cx && isRiverCellAt(x, from.y)) {
+            x = (x > from.x) ? (cx + 1.0f) * CLIENT_RIVER_CELL - EDGE : cx * CLIENT_RIVER_CELL + EDGE;
+        }
+        float y = to.y;
+        if (isRiverCellAt(x, from.y) && std::floor(y / CLIENT_RIVER_CELL) != cy && isRiverCellAt(x, y)) {
+            y = (y > from.y) ? (cy + 1.0f) * CLIENT_RIVER_CELL - EDGE : cy * CLIENT_RIVER_CELL + EDGE;
+        }
+        return Vector2D{ x, y };
+    }
+
+    // One 50 ms separation pass for one body, applied to it at once (the next body sees where it went), plus `step`
+    // (its share of this tick's own move) in the same move. Per neighbour on its layer (ground / air) within
+    // radius + radius + CLIENT_CONTACT_SKIN: min(overlap clamped to [0, 0.3] x its Mass / own Mass, 0.299) + 0.001,
+    // away from it; coincident centres 0.001 along y, toward the unit's own side. The pushes are averaged over the
+    // contacts and capped at CLIENT_MAX_PUSH. Mass is the client's (Fidelity::clientBodies); equal without it.
+    // No sideways nudge. Buildings are not contacts here (finishClientPushTick keeps their static push-out).
+    void clientSelfPush(Entity& self, const Vector2D& step = Vector2D{ 0.0f, 0.0f }) {
+        float px = 0.0f, py = 0.0f;
+        int contacts = 0;
+        if (self.isAlive() && self.collidesAsBody(*this)) {
+            const float r1 = bodyRadiusOf(self);
+            const float m1 = static_cast<float>(self.mass);
+            for (const auto& o : activeEntities) {
+                Entity& other = *o;
+                if (&other == &self || !other.isAlive() || other.getCollisionRadius() > 0.0f) continue;
+                if (other.isFlying != self.isFlying || !other.collidesAsBody(*this)) continue;
+                const float r2 = bodyRadiusOf(other);
+                const float dx = self.position.x - other.position.x;
+                const float dy = self.position.y - other.position.y;
+                const float dist = std::sqrt(dx * dx + dy * dy);
+                if (dist >= r1 + r2 + CLIENT_CONTACT_SKIN) continue;
+                ++contacts;
+                if (dist < 0.001f) {
+                    py += (self.team == 0) ? -CLIENT_MIN_PUSH : CLIENT_MIN_PUSH;
+                    continue;
+                }
+                const float m2 = static_cast<float>(other.mass);
+                const float ratio = (Fidelity::clientBodies && m1 > 0.0f && m2 > 0.0f) ? m2 / m1 : 1.0f;
+                const float overlap = std::max(0.0f, std::min(r1 + r2 - dist, CLIENT_MAX_OVERLAP));
+                const float push = std::min(overlap * ratio, CLIENT_MAX_SHARE) + CLIENT_MIN_PUSH;
+                px += dx / dist * push;
+                py += dy / dist * push;
+            }
+            if (contacts > 0) {
+                px /= static_cast<float>(contacts);
+                py /= static_cast<float>(contacts);
+                const float len = std::sqrt(px * px + py * py);
+                if (len > CLIENT_MAX_PUSH) { px *= CLIENT_MAX_PUSH / len; py *= CLIENT_MAX_PUSH / len; }
+            }
+        }
+        if (contacts == 0 && step.x == 0.0f && step.y == 0.0f) return;
+        const Vector2D from = self.position;
+        Vector2D to{ from.x + px + step.x, from.y + py + step.y };
+        if (self.respectsRiver()) {
+            to = clientRiverMove(from, to, contacts > 0);
+            if (contacts > 0 && isRiverCellAt(to.x, to.y)) self.riverPushed = true;
+        }
+        self.position = to;
+    }
+
+    // GameManager::step under Fidelity::clientCollision: the 100 ms tick as two 50 ms client ticks. Pass one, per
+    // entity in order: clientSelfPush, then its update(), of whose move only half is kept (holdHalfStep). Pass two
+    // (finishClientPushTick), per entity in order: clientSelfPush with the other half of the move. Then buildings'
+    // static push-out and the clamps, as resolveCollisions ends.
+    void beginClientPushTick() {
+        clientHalfSteps.assign(activeEntities.size(), Vector2D{ 0.0f, 0.0f });
+    }
+    // Only bodies (troops: no collision radius, hit by area damage) split their move; projectiles and spells don't.
+    void holdHalfStep(size_t index, const Vector2D& before) {
+        Entity& e = *activeEntities[index];
+        if (!e.isAlive() || e.getCollisionRadius() > 0.0f || !e.isAreaHittable()) return;
+        const Vector2D half{ (e.position.x - before.x) * 0.5f, (e.position.y - before.y) * 0.5f };
+        e.position.x -= half.x;
+        e.position.y -= half.y;
+        clientHalfSteps[index] = half;
+    }
+    void finishClientPushTick() {
+        for (size_t i = 0; i < activeEntities.size(); ++i) {
+            Entity& e = *activeEntities[i];
+            if (!e.isAlive()) continue;
+            clientSelfPush(e, i < clientHalfSteps.size() ? clientHalfSteps[i] : Vector2D{ 0.0f, 0.0f });
+        }
+        // Buildings: the engine's static push-out (resolveCollisions' troop-building case), unchanged.
+        for (const auto& e : activeEntities) {
+            if (!e->isAlive() || e->isFlying || e->getCollisionRadius() > 0.0f || !e->isTargetable()) continue;
+            e->position = resolvePositionAgainstBuildings(e->position, e->id, bodyRadiusOf(*e));
+        }
+        for (auto& entity : activeEntities) {
+            if (entity->isAlive()) entity->clampPosition(*this);
         }
     }
 

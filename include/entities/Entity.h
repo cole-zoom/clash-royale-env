@@ -81,6 +81,19 @@ public:
     float bodyRadius = 0.0f;
     int mass = 0;
 
+    // Fidelity::clientCollision state. jumpSpeed: the client's JumpSpeed (tiles a tick) for its JumpEnabled troops,
+    // 0 for the rest. jumpingRiver: mid-jump over the river (Troop::moveTowards). riverPushed: a body push left the
+    // centre in a river cell (Board::clientSelfPush), so Troop::clampPosition does not snap it to the bank.
+    float jumpSpeed = 0.0f;
+    bool jumpingRiver = false;
+    bool riverPushed = false;
+
+    // Fidelity::clientCollision: whether this is a body that pushes itself off its neighbours and counts as one
+    // (Troop: a moving troop not deploying, dashing or jumping). Buildings are not: they keep the static push-out.
+    virtual bool collidesAsBody(const Board& board) const { (void)board; return false; }
+    // Whether the river stops this body (Troop: ground and not riverIgnores).
+    virtual bool respectsRiver() const { return false; }
+
     // Damage on its way to an entity, for the pending-damage skip (Fidelity::pendingDamageSkip): a projectile in
     // flight reports its target's id, its damage and how long until it lands (ms); everything else -1 / 0 / 0.
     virtual int incomingTargetId() const { return -1; }
