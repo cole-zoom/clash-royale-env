@@ -296,8 +296,11 @@ private:
             .withIgnoresRiver();
     }
     static CardStats goblinGiantSpearGoblinsStats() {
+        // Carried (withAttachedUnit, client SpawnAttach): when the Goblin Giant dies each drops off as an ordinary
+        // Spear Goblin (SpearGoblinGiant DeathSpawnCharacter SpearGoblin, DeathSpawnDeployTime 700).
         return troop(-26, "Spear Goblins", 0.0f, Archetype::RangedSquad, 133, SPEED_VERY_FAST, 5.0f, 81, secs(1.6), 'S')
-            .withOffsets({ {-0.4f, 0.3f}, {0.4f, 0.3f} }).withTargetsAir();
+            .withOffsets({ {-0.4f, 0.3f}, {0.4f, 0.3f} }).withTargetsAir()
+            .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinHutSpearGoblinStats().withDeployTime(secs(0.7))));
     }
 
     // Further death-spawn children, from a later research pass. Ids continue
@@ -794,7 +797,7 @@ private:
             .withParry(secs(3.5)));
         // client goblin_machine.toml Hitpoints 885 -> 2266, Damage 91 -> 233, Speed 60 (was 2150, 212, slow) (2026-10-28)
         add(troop(55, "Goblin Machine", 5.0f, Archetype::MeleeSquad, 2266, SPEED_MEDIUM, 1.2f, 233, secs(1.2), '3')
-            .withSecondaryUnit(goblinMachineTurretStats())); // independently targeting rocket turret
+            .withAttachedUnit(goblinMachineTurretStats())); // independently targeting rocket turret
 
         // Inferno Dragon and Electro Dragon: instant zaps, so MeleeSquad as
         // with Electro Wizard. Inferno Dragon ramps 36 -> 120 -> 422 every 2 s
@@ -994,11 +997,11 @@ private:
         // client ram_rider.toml (Ram) Damage 106 -> 271, Range 0.8 (was 250, 1.0) (2026-10-28)
         add(troop(87, "Ram Rider", 5.0f, Archetype::MeleeBuildingTargeter, 1766, SPEED_MEDIUM, 0.8f, 271, secs(1.7), '"')
             .withCharge(3.0f, 2.0f).withChargeSpeed(2.0f) // the ram charges at 2x (item 35)
-            .withSecondaryUnit(ramRiderCrossbowStats()) // the rider's independently targeting crossbow (default 5.5 sight)
+            .withAttachedUnit(ramRiderCrossbowStats()) // the rider's independently targeting crossbow (default 5.5 sight)
             .withSightRange(7.5f) // the ram itself
             .withIgnoresRiver());
         add(troop(88, "Goblin Giant", 6.0f, Archetype::MeleeBuildingTargeter, 3110, SPEED_MEDIUM, 1.2f, 176, secs(1.5), '`')
-            .withSecondaryUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f)); // carried Spear Goblins, independently targeting
+            .withAttachedUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f)); // carried Spear Goblins, independently targeting
         // Skeleton Barrel: pops on reaching its building (skeletonBarrelDeath). Was: hit the building for 81 a
         // second until shot down, then 2 Skeletons and no explosion (2026-10-28).
         add(troop(89, "Skeleton Barrel", 3.0f, Archetype::MeleeBuildingTargeter, 532, SPEED_FAST, 0.35f, 0, secs(0.3), ',')
@@ -1668,9 +1671,9 @@ private:
         // effect cannot be gated on hp.
         addEvolution(159,
             troop(88, "Goblin Giant", 6.0f, Archetype::MeleeBuildingTargeter, 3110, SPEED_MEDIUM, 1.2f, 176, secs(1.5), '`')
-                .withSecondaryUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f),
+                .withAttachedUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f),
             troop(88, "Goblin Giant", 6.0f, Archetype::MeleeBuildingTargeter, 3110, SPEED_MEDIUM, 1.2f, 176, secs(1.5), '`')
-                .withSecondaryUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f)
+                .withAttachedUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f)
                 .withPeriodicEffect(secs(2.2), std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats())),
             2, 1);
 

@@ -217,6 +217,8 @@ struct CardStats {
     // Rascals): a second, independently targeting unit spawned at the same
     // point by CardFactories::spawn.
     std::shared_ptr<CardStats> secondaryUnit;
+    // The secondary unit rides the first (the client's SpawnAttach) instead of walking on its own.
+    bool secondaryAttached = false;
 
     // Periodic spawning while alive (Witch, Night Witch, Furnace, Barbarian
     // Hut, Goblin Hut, Tombstone, Goblin Drill). First fires after one full
@@ -563,6 +565,11 @@ struct CardStats {
     }
     CardStats& withSecondaryUnit(CardStats unit) {
         secondaryUnit = std::make_shared<CardStats>(std::move(unit));
+        return *this;
+    }
+    CardStats& withAttachedUnit(CardStats unit) {
+        secondaryUnit = std::make_shared<CardStats>(std::move(unit));
+        secondaryAttached = true;
         return *this;
     }
     CardStats& withSpellClone() {

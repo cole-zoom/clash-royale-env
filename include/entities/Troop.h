@@ -8,6 +8,9 @@ protected:
 public:
     bool riverIgnores = false;
 
+    // A carried unit (Entity::attachedToId): it never walks, it rides, and crosses the river where its carrier does.
+    void makeRider() { speed = 0.0f; riverIgnores = true; }
+
     // Base speed for the observation encoder. Not freeze-adjusted: the
     // observation describes the unit, and a freeze shows up as it not moving.
     float getSpeed() const { return speed; }

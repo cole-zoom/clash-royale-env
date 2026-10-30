@@ -81,6 +81,13 @@ public:
     float bodyRadius = 0.0f;
     int mass = 0;
 
+    // A carried unit (the client's SpawnAttach: the Ram Rider's rider, Goblin Giant's Spear Goblins; the Goblin
+    // Machine's rocket launcher by the same rule): the id of the unit it rides and its seat relative to it, -1 for
+    // everything else. It rides along, can't be targeted or hit, doesn't push, and dies with its carrier
+    // (CombatEntity::followCarrier). An id, not a pointer, so snapshots copy it as is.
+    int attachedToId = -1;
+    Vector2D attachOffset{ 0.0f, 0.0f };
+
     // Fidelity::clientCollision state. jumpSpeed: the client's JumpSpeed (tiles a tick) for its JumpEnabled troops,
     // 0 for the rest. jumpingRiver: mid-jump over the river (Troop::moveTowards). riverPushed: a body push left the
     // centre in a river cell (Board::clientSelfPush), so Troop::clampPosition does not snap it to the bank.

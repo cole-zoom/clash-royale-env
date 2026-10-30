@@ -57,6 +57,7 @@ struct UnitView {
     bool targetable;   // false for spells in flight and projectiles
     int deployTicks;   // deploy time left in API steps (100 ms), rounded up (0 for non-combat entities)
     int targetId;      // the entity it is locked onto, -1 for none
+    int attachedTo;    // a carried unit's carrier (Entity::attachedToId; untargetable, but a body, not a spell), else -1
 };
 
 struct SelfPlayFastResult {
@@ -689,7 +690,7 @@ public:
         for (const auto& e : game.getBoard().getEntities()) {
             if (!e->isAlive()) continue;
             UnitView u{e->id, e->cardId, e->name, e->team, e->position.x, e->position.y, e->hp,
-                       e->isFlying, e->isBuilding(), e->isTower(), e->isTargetable(), 0, -1};
+                       e->isFlying, e->isBuilding(), e->isTower(), e->isTargetable(), 0, -1, e->attachedToId};
             if (const auto* c = dynamic_cast<const CombatEntity*>(e.get())) {
                 u.deployTicks = ticksToStepsCeil(c->deployTicksRemaining);
                 u.targetId = c->getCurrentTargetId();

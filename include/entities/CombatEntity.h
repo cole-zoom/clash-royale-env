@@ -527,9 +527,26 @@ public:
         attackCooldown(attackCooldown), currentCooldown(0.0f) {}
 
     bool isTargetable() const override {
+        if (attachedToId >= 0) return false;  // carried: only its carrier can be hit
         return (!startsInvisible || visibleTicksRemaining > 0) && temporaryInvisibilityTicksRemaining <= 0;
     }
-    bool isAreaHittable() const override { return true; }  // invisibility hides from targeting, not from area damage
+    // invisibility hides from targeting, not from area damage; a carried unit is out of reach of both
+    bool isAreaHittable() const override { return attachedToId < 0; }
+
+    // A carried unit takes its carrier's position plus its seat each tick, before acting; with the carrier gone it
+    // dies (its death effect fires: Goblin Giant's Spear Goblins drop off as ordinary ones). False once dead.
+    bool followCarrier(Board& board) {
+        if (attachedToId < 0) return true;
+        const Entity* host = nullptr;
+        for (const auto& e : board.getEntities())
+            if (e->id == attachedToId) { host = e.get(); break; }
+        if (host == nullptr || !host->isAlive()) {
+            hp = 0;
+            return false;
+        }
+        position = Vector2D{ host->position.x + attachOffset.x, host->position.y + attachOffset.y };
+        return true;
+    }
 
     // Soul collection: any death within radius, ally or enemy.
     void onNearbyDeath(Board&, const Vector2D& deathPosition, int) override {
@@ -681,6 +698,7 @@ public:
     }
 
     void update(Board& board) override {
+        if (!followCarrier(board)) return;
         // Deploy time: only the decrement happens here. The bail-out is below
         // the status timers, because a deploying unit is inert, not
         // time-stopped: poison, cooldowns and buffs keep ticking.

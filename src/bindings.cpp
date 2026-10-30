@@ -73,7 +73,8 @@ PYBIND11_MODULE(clash_royale_env, m) {
         .def_readonly("tower", &UnitView::tower)
         .def_readonly("targetable", &UnitView::targetable)
         .def_readonly("deploy_ticks", &UnitView::deployTicks)
-        .def_readonly("target_id", &UnitView::targetId);
+        .def_readonly("target_id", &UnitView::targetId)
+        .def_readonly("attached_to", &UnitView::attachedTo);
 
     py::class_<ClashEnv>(m, "ClashRoyaleEnv")
         .def(py::init<const std::vector<int>&, const std::vector<int>&, int, TowerTroopType, TowerTroopType>(),

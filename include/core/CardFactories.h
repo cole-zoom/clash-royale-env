@@ -295,6 +295,7 @@ inline void spawnSpell(const CardStats& stats, float x, float y, int team, Board
 }
 
 inline void spawn(const CardStats& stats, float x, float y, int team, Board& board) {
+    const size_t firstNew = board.pendingEntityCount();
     switch (stats.archetype) {
         case Archetype::MeleeSquad:             spawnMeleeSquad(stats, x, y, team, board); break;
         case Archetype::RangedSquad:             spawnRangedSquad(stats, x, y, team, board); break;
@@ -308,7 +309,17 @@ inline void spawn(const CardStats& stats, float x, float y, int team, Board& boa
     // Rascals): the second, independently targeting unit spawns at the same
     // point.
     if (stats.secondaryUnit) {
+        const size_t riders = board.pendingEntityCount();
         spawn(*stats.secondaryUnit, x, y, team, board);
+        if (stats.secondaryAttached && riders > firstNew) {
+            const auto& host = board.getPendingEntity(firstNew);
+            for (size_t i = riders; i < board.pendingEntityCount(); ++i) {
+                const auto& rider = board.getPendingEntity(i);
+                rider->attachedToId = host->id;
+                rider->attachOffset = Vector2D{ rider->position.x - host->position.x, rider->position.y - host->position.y };
+                if (auto t = std::dynamic_pointer_cast<Troop>(rider)) t->makeRider();
+            }
+        }
     }
 }
 
