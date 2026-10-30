@@ -1237,7 +1237,14 @@ public:
                     }
                 }
             }
-            // attacking: no movement
+            // Attacking: no movement, except onto a crown tower. With Fidelity::towerReachFootprint the attack starts
+            // at the tower's tile footprint and the unit keeps walking, swinging, until it is at its reach to the
+            // tower's body (CollisionRadius), where real units stand: lab L04's Giant hit at 23.8 still walking at its
+            // full 0.75 tiles/s and stood at 24.1 (the replays' standing Giants, tests/test_sim.py).
+            if (Fidelity::towerReachFootprint && target->isTower() && !stunned
+                && dist > attackRange + ownEffectiveRadius() + effectiveRadiusOf(*target)) {
+                moveTowards(board, LanePath::approachPoint(board, team, position, target));
+            }
         } else if (jumpStep(board, target, dist, reach, stunned)) {
         } else if (hookStep(target, dist, reach, stepMs)) {
         } else {

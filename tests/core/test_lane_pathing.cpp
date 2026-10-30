@@ -300,8 +300,7 @@ TEST_CASE("an Ice Golem walking to the King never stalls en route",
 
     // Stalls are measured only during the approach: a unit standing still to
     // fight at the King has arrived, not stalled.
-    // At the King: its reach is to the 4x4 footprint (2.0) since Fidelity::towerReachFootprint, so it stops ~3.4 out.
-    const float arrived = 3.6f;
+    const float arrived = 3.2f;
     Vector2D last = golem->position;
     int stillFor = 0, longestStall = 0, ticksToArrive = -1;
 
