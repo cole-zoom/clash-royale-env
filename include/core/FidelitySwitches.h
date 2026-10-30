@@ -65,6 +65,14 @@ struct Fidelity {
     // The Princess Tower's first arrow comes HitSpeed (800 ms) after it acquires from idle (no LoadTime). OFF by
     // default: Cole's "fires right away" against the code; lab L18 decides.
     static inline bool princessFirstShotDelay = false;
+    // Attack reach to a crown tower is measured to its tile footprint (Princess 3x3: 1.5, King 4x4: 2.0, the same
+    // radii as targeting) instead of its CollisionRadius (1.0 / 1.4). Lab night 1: a Giant (L04) and a Hog (L18) hit
+    // the tower 1.0 s and 0.2 s before the engine's, at matching positions, which the 0.5-tile difference explains
+    // at their speeds. With it the Hog's six tower hits land at the replay's times to the 50 ms frame, the Giant's first
+    // 0.4 s late (was 1.0), and the lab's sim - real death times average -0.01 s (was -0.10, mean |d| 0.24 vs 0.33).
+    // Held-back S2: positions and winner unchanged; the sim's princess-tower damage +8% (already above the replays',
+    // where card and tower levels differ from the engine's).
+    static inline bool towerReachFootprint = true;
     // Elixir at the client's rate (battle_timelines Default: 28 s / 14 s / 9.3 s a bar, i.e. 2.8 s an elixir at 1x)
     // instead of 0.035 per 100 ms (2.857 s). OFF by default: perception's opponent-elixir tracker assumes the engine's
     // rate; for Cole to decide.

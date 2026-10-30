@@ -136,3 +136,26 @@ TEST_CASE("an enemy tower doesn't wake a Goblin Hut", "[lab][goblin_hut][regress
     m.step(60);
     REQUIRE(m.goblins(0) == 0);
 }
+
+// L18 / L04: reach to a crown tower is measured to its tile footprint (Princess 1.5), not its collision radius (1.0).
+TEST_CASE("a troop reaches a Princess Tower at its 1.5-tile footprint", "[lab][tower_reach][regression]") {
+    struct Restore { bool was = Fidelity::towerReachFootprint; ~Restore() { Fidelity::towerReachFootprint = was; } } r;
+    for (bool footprint : { true, false }) {
+        Fidelity::towerReachFootprint = footprint;
+        Match m;
+        std::shared_ptr<Entity> tower;
+        for (const auto& e : m.board().getEntities())
+            if (e->isTower() && e->team == 1 && e->symbol != 'R' && e->position.x < 9.0f) tower = e;
+        REQUIRE(tower);
+        const int hp0 = tower->hp;
+        // A standing attacker 0.5 range, 2.4 from the tower's centre: in reach at 0.5 + its body + 1.5, not at + 1.0.
+        auto d = std::make_shared<StationaryCombatant>(m.board().allocateId(), tower->position.x,
+                                                       tower->position.y - 2.4f, 1000000, 0, 0.5f, 100, 10);
+        spawn(m.board(), d);
+        REQUIRE(bodyRadiusOf(*d) + 0.5f + 1.5f >= 2.4f);
+        REQUIRE(bodyRadiusOf(*d) + 0.5f + tower->getCollisionRadius() < 2.4f);
+        m.step(30);
+        INFO("footprint " << footprint);
+        REQUIRE((tower->hp < hp0) == footprint);
+    }
+}

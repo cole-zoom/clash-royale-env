@@ -1296,7 +1296,13 @@ protected:
     }
 
     float effectiveRangeTo(const std::shared_ptr<Entity>& target) const {
-        return attackRange + ownEffectiveRadius() + effectiveRadiusOf(*target);
+        return attackRange + ownEffectiveRadius() + reachRadiusOf(*target);
+    }
+
+    // The target's share of attack reach: its body, or a crown tower's tile footprint (Fidelity::towerReachFootprint).
+    static float reachRadiusOf(const Entity& e) {
+        if (Fidelity::towerReachFootprint && e.isTower()) return e.getTargetingRadius();
+        return effectiveRadiusOf(e);
     }
 
     // Sight to `target`; see effectiveSightWith.
@@ -1348,7 +1354,7 @@ protected:
         // EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS (globals.csv 2000): a troop sees a crown tower 2 tiles further.
         if (Fidelity::crownTowerSightBonus && !isBuilding() && target.isTower())
             sight += CLIENT_EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS / 1000.0f;
-        const float attackReach = attackRange + myRadius + effectiveRadiusOf(target);
+        const float attackReach = attackRange + myRadius + reachRadiusOf(target);
         if (sightEdgeToEdge) {
             const float edge = sight + myRadius + effectiveRadiusOf(target);
             return attackReach > edge ? attackReach : edge;
