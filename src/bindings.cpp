@@ -308,6 +308,7 @@ PYBIND11_MODULE(clash_royale_env, m) {
     CRE_FIDELITY_SWITCH("client_collision", clientCollision)
     CRE_FIDELITY_SWITCH("bridge_own_line", bridgeOwnLine)
     CRE_FIDELITY_SWITCH("obstacle_slide", obstacleSlide)
+    CRE_FIDELITY_SWITCH("pocket_deploy", pocketDeploy)
 #undef CRE_FIDELITY_SWITCH
     m.def("get_all_card_ids", &getAllCardIds,
         "All ids CardRegistry currently has registered (real, playable cards only).");

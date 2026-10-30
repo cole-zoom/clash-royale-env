@@ -485,6 +485,27 @@ public:
     // `isRollingSpell` narrows the spell exemption for The Log and Barbarian
     // Barrel, and `ownSideOnly` narrows it further, to a troop's own side, for
     // Barbarian Barrel (see the end of this function).
+    // The pocket (Fidelity::pocketDeploy): once an enemy Princess Tower is down, its lane's half of their side opens
+    // from the river to POCKET_DEPTH tiles past it (Cole: "Once you take a tower, you can place higher up"; "pocket =
+    // 4 tiles past the river"). The lane is the side of the centre line x is on.
+    static constexpr float POCKET_DEPTH = 4.0f;
+    bool inPocket(int team, float x, float y) const {
+        if (!Fidelity::pocketDeploy) return false;
+        const bool left = ArenaLayout::isLeftLane(x);
+        if (team == 0) {
+            const float lo = board.getRiverEnd() + OWN_HALF_RIVER_BUFFER;
+            if (y < lo || y > lo + POCKET_DEPTH - 1.0f) return false;
+        } else {
+            const float hi = board.getRiverStart() - OWN_HALF_RIVER_BUFFER;
+            if (y > hi || y < hi - POCKET_DEPTH + 1.0f) return false;
+        }
+        for (const auto& e : board.getEntities()) {
+            if (e->team == team || !e->isTower() || e->symbol == 'R') continue;
+            if (ArenaLayout::isLeftLane(e->position.x) == left && e->isAlive()) return false;  // still standing
+        }
+        return true;
+    }
+
     bool isValidPlacement(int team, float x, float y, bool isSpell, float placedRadius,
                           bool deployAnywhere = false, bool isRollingSpell = false,
                           bool ownSideOnly = false) const {
@@ -509,8 +530,8 @@ public:
             // Deploy-anywhere cards (Miner, Goblin Drill) skip the own-half
             // rule but not the building check below.
             if (!deployAnywhere) {
-                if (team == 0 && y > board.getRiverStart() - OWN_HALF_RIVER_BUFFER) return false;
-                if (team == 1 && y < board.getRiverEnd() + OWN_HALF_RIVER_BUFFER) return false;
+                if (team == 0 && y > board.getRiverStart() - OWN_HALF_RIVER_BUFFER && !inPocket(team, x, y)) return false;
+                if (team == 1 && y < board.getRiverEnd() + OWN_HALF_RIVER_BUFFER && !inPocket(team, x, y)) return false;
             }
 
             // Nothing may be placed on an existing building: the gap is its

@@ -101,4 +101,7 @@ struct Fidelity {
     // gets past an enemy Giant it ignores. Off: the static push-out leaves only the sideways part of each
     // step, so a Giant dropped behind its King Tower crawls along it for ~5 s (Cole's play page, 2026-10-30).
     static inline bool obstacleSlide = true;
+    // The pocket: with an enemy Princess Tower down, troops and buildings may be placed on that lane's half of their
+    // side, from the river to GameManager::POCKET_DEPTH (4) tiles past it (Cole, 2026-10-30). Off: own half only.
+    static inline bool pocketDeploy = true;
 };
