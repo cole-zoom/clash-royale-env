@@ -189,7 +189,7 @@ public:
         const Vector2D to = (t && t->isAlive() && homing) ? t->position : aimPoint;
         const float d = position.distanceTo(to);
         const int ticks = (speed > 0.0f) ? std::max(1, static_cast<int>(std::ceil(d / speed))) : 1;
-        return ticks * 100;
+        return ticks * TICK_MS;
     }
 
     bool isTargetable() const override { return false; }

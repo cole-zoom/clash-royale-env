@@ -142,13 +142,13 @@ TEST_CASE("Inferno Dragon Evolution's evolved spawn carries the ramp grace perio
     REQUIRE(dragonCount == 3); // 3 plays, 1 Inferno Dragon each
     REQUIRE(evolvedDragon != nullptr); // exactly one of the 3 is the evolved play
 
-    REQUIRE(evolvedDragon->rampGracePeriodTicks == 90); // 9s at this engine's 10-ticks/second rate
-    REQUIRE(evolvedDragon->rampStage4Tick == 200); // 20s
+    REQUIRE(evolvedDragon->rampGracePeriodTicks == secs(9.0)); // 9s
+    REQUIRE(evolvedDragon->rampStage4Tick == secs(20.0)); // 20s
     REQUIRE(evolvedDragon->rampStage4Fraction == Catch::Approx(2.0f));
     // The base 3-stage ramp is unchanged; only the charge-up behaviour differs.
     // client infernodragon.toml VariableDamageTime1 / 2: 2 s each (2026-10-28; was 1.5 s)
-    REQUIRE(evolvedDragon->rampMidTick == 20);
-    REQUIRE(evolvedDragon->rampFullTick == 40);
+    REQUIRE(evolvedDragon->rampMidTick == secs(2.0));
+    REQUIRE(evolvedDragon->rampFullTick == secs(4.0));
 }
 
 TEST_CASE("Minion Horde Evolution's Dark Guard turns a member untargetable after it takes damage",
@@ -179,7 +179,7 @@ TEST_CASE("Minion Horde Evolution's Dark Guard turns a member untargetable after
     REQUIRE(evolvedMinion->isTargetable()); // untouched so far
     evolvedMinion->takeDamage(1);
     REQUIRE_FALSE(evolvedMinion->isTargetable()); // Dark Guard triggered: briefly untargetable
-    REQUIRE(evolvedMinion->temporaryInvisibilityTicksRemaining == 30); // 3s at this engine's 10-ticks/second rate
+    REQUIRE(evolvedMinion->temporaryInvisibilityTicksRemaining == secs(3.0)); // 3s
 }
 
 TEST_CASE("Skeleton Army Evolution's evolved play deploys 16 skeletons (+1, the Skeleton General), not 15",

@@ -136,7 +136,7 @@ TEST_CASE("Mirror can duplicate a Champion, and the ability targets whichever in
         if (ce->id == originalId) {
             REQUIRE(ce->abilityCooldownRemaining == 0); // original untouched
         } else {
-            REQUIRE(ce->abilityCooldownRemaining == 130); // the mirrored copy actually activated
+            REQUIRE(ce->abilityCooldownRemaining == secs(13.0)); // the mirrored copy actually activated
         }
     }
 }

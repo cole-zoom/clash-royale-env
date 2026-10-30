@@ -6,6 +6,7 @@
 #include "ArenaLayout.h"
 #include "Entity.h"
 #include "StatsEventBus.h"
+#include "Tick.h"
 
 class Board {
 private:
@@ -40,9 +41,6 @@ private:
     mutable std::vector<Body> bodyScratch;
     mutable std::vector<Collider> colliderCache;
     mutable bool collidersDirty = true;
-    // Fidelity::clientCollision: the half of each entity's step held back for the tick's second 50 ms pass, by
-    // index into activeEntities (beginClientPushTick .. finishClientPushTick).
-    std::vector<Vector2D> clientHalfSteps;
 
     // The arena is 18x34: one row behind each King is dead space except a
     // centred opening of real ground (isBackRowDeadZone).
@@ -219,7 +217,8 @@ public:
 
     // Push a point out of a circular obstacle, with a small perpendicular slide
     // so it travels around instead of sticking. Shared by movement and
-    // collision resolution.
+    // collision resolution, so once a tick: 0.05 tile per 100 ms.
+    static constexpr float SLIDE_PER_TICK = perTick(0.5f);
     static Vector2D pushAwayFrom(Vector2D pos, const Vector2D& obstacleCenter, float minDist) {
         float dx = pos.x - obstacleCenter.x;
         float dy = pos.y - obstacleCenter.y;
@@ -236,8 +235,8 @@ public:
                 ux = dx / dist; uy = dy / dist;
             }
             float push = minDist - dist;
-            pos.x += ux * push + uy * 0.05f;
-            pos.y += uy * push - ux * 0.05f;
+            pos.x += ux * push + uy * SLIDE_PER_TICK;
+            pos.y += uy * push - ux * SLIDE_PER_TICK;
         }
         return pos;
     }
@@ -327,8 +326,8 @@ public:
                         const float share2 = 1.0f - share1;
                         const float ux = dx / dist, uy = dy / dist;
 
-                        // Tiny orthogonal nudge to prevent jitter lock.
-                        float noise = 0.01f;
+                        // Tiny orthogonal nudge to prevent jitter lock: 0.01 tile per 100 ms.
+                        const float noise = perTick(0.1f);
                         e1->position.x += ux * overlap * share1 + uy * noise;
                         e1->position.y += uy * overlap * share1 - ux * noise;
                         e2->position.x -= ux * overlap * share2 + uy * noise;
@@ -355,14 +354,15 @@ public:
     }
 
     // ---- Fidelity::clientCollision: the client's body pushing (bot-77 docs/client-code-notes.md §5) ----
-    // Separation 0x71fff6058c and move step 0x71fff60bd4, one logic tick = 50 ms; lengths in tiles (client 1/1000).
+    // Separation 0x71fff6058c and move step 0x71fff60bd4, one logic tick = 50 ms = one engine tick (Tick.h); lengths
+    // in tiles (client 1/1000).
     static constexpr float CLIENT_MAX_OVERLAP = 0.3f;     // overlap counted per neighbour, at most
     static constexpr float CLIENT_MAX_SHARE = 0.299f;     // overlap x Mass ratio, at most
     static constexpr float CLIENT_MIN_PUSH = 0.001f;      // added to every contact's push
     static constexpr float CLIENT_CONTACT_SKIN = 0.02f;   // bodies this close count as contacts
-    static constexpr float CLIENT_MAX_PUSH = 0.15f;       // the averaged push, per 50 ms
+    static constexpr float CLIENT_MAX_PUSH = 0.15f;       // the averaged push, per 50 ms tick
     static constexpr float CLIENT_RIVER_CELL = 0.5f;      // tilemap cell (36 x 64 over the arena)
-    static constexpr float CLIENT_RIVER_NUDGE = 0.256f;   // toward the nearer bank, per 50 ms, while pushed in a river cell
+    static constexpr float CLIENT_RIVER_NUDGE = 0.256f;   // toward the nearer bank, per 50 ms tick, while pushed in a river cell
 
     // A river tilemap cell: the river band, off the bridges. Cells are CLIENT_RIVER_CELL squares on the board's
     // half-tile grid (the band [15.5, 17.5) is four rows of them); a cell is a bridge cell if its centre is on a
@@ -397,11 +397,11 @@ public:
     }
 
     // One 50 ms separation pass for one body, applied to it at once (the next body sees where it went), plus `step`
-    // (its share of this tick's own move) in the same move. Per neighbour on its layer (ground / air) within
+    // (its own move this tick) in the same move. Per neighbour on its layer (ground / air) within
     // radius + radius + CLIENT_CONTACT_SKIN: min(overlap clamped to [0, 0.3] x its Mass / own Mass, 0.299) + 0.001,
     // away from it; coincident centres 0.001 along y, toward the unit's own side. The pushes are averaged over the
     // contacts and capped at CLIENT_MAX_PUSH. Mass is the client's (Fidelity::clientBodies); equal without it.
-    // No sideways nudge. Buildings are not contacts here (finishClientPushTick keeps their static push-out).
+    // No sideways nudge. Buildings are not contacts here (settleClientPushTick keeps their static push-out).
     void clientSelfPush(Entity& self, const Vector2D& step = Vector2D{ 0.0f, 0.0f }) {
         float px = 0.0f, py = 0.0f;
         int contacts = 0;
@@ -446,28 +446,19 @@ public:
         self.position = to;
     }
 
-    // GameManager::step under Fidelity::clientCollision: the 100 ms tick as two 50 ms client ticks. Pass one, per
-    // entity in order: clientSelfPush, then its update(), of whose move only half is kept (holdHalfStep). Pass two
-    // (finishClientPushTick), per entity in order: clientSelfPush with the other half of the move. Then buildings'
-    // static push-out and the clamps, as resolveCollisions ends.
-    void beginClientPushTick() {
-        clientHalfSteps.assign(activeEntities.size(), Vector2D{ 0.0f, 0.0f });
-    }
-    // Only bodies (troops: no collision radius, hit by area damage) split their move; projectiles and spells don't.
-    void holdHalfStep(size_t index, const Vector2D& before) {
+    // GameManager::tick under Fidelity::clientCollision, one engine tick = one 50 ms client tick. Per entity in order:
+    // its update(), then clientMoveStep, which takes back the move update() made and applies it together with the
+    // body's separation push from where it stood (the client's move step: push + walking step in one move, before the
+    // next unit's turn). Then settleClientPushTick: buildings' static push-out and the clamps, as resolveCollisions
+    // ends. Only bodies (troops: no collision radius, hit by area damage) push; projectiles and spells keep their move.
+    void clientMoveStep(size_t index, const Vector2D& before) {
         Entity& e = *activeEntities[index];
         if (!e.isAlive() || e.getCollisionRadius() > 0.0f || !e.isAreaHittable()) return;
-        const Vector2D half{ (e.position.x - before.x) * 0.5f, (e.position.y - before.y) * 0.5f };
-        e.position.x -= half.x;
-        e.position.y -= half.y;
-        clientHalfSteps[index] = half;
+        const Vector2D step{ e.position.x - before.x, e.position.y - before.y };
+        e.position = before;
+        clientSelfPush(e, step);
     }
-    void finishClientPushTick() {
-        for (size_t i = 0; i < activeEntities.size(); ++i) {
-            Entity& e = *activeEntities[i];
-            if (!e.isAlive()) continue;
-            clientSelfPush(e, i < clientHalfSteps.size() ? clientHalfSteps[i] : Vector2D{ 0.0f, 0.0f });
-        }
+    void settleClientPushTick() {
         // Buildings: the engine's static push-out (resolveCollisions' troop-building case), unchanged.
         for (const auto& e : activeEntities) {
             if (!e->isAlive() || e->isFlying || e->getCollisionRadius() > 0.0f || !e->isTargetable()) continue;

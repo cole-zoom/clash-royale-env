@@ -3,6 +3,7 @@
 #include <limits>
 
 #include "Board.h"
+#include "Tick.h"
 
 class MatchRules {
 public:
@@ -12,9 +13,9 @@ public:
         int loserTeam;
     };
 
-    // The end of regulation: 1800 ticks = 3:00, the real schedule. Triple
+    // The end of regulation, in engine ticks: 3:00, the real schedule. Triple
     // elixir starts a minute later (GameManager::TRIPLE_ELIXIR_TICK).
-    static constexpr int REGULATION_END_TICK = 1800;
+    static constexpr int REGULATION_END_TICK = secs(180.0);
 
     // Surviving towers per side, and the weakest one's hp. Uses isTower(),
     // never the 'R' symbol, which Mortar (card 93) shares.

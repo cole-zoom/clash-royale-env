@@ -233,7 +233,7 @@ TEST_CASE("every deployable card in the deck is inert for its deploy time",
         REQUIRE(combat->deployTicksRemaining == DEPLOY_TIME_TICKS);
 
         const Vector2D placed = e->position;
-        m.step(DEPLOY_TIME_TICKS);
+        m.step(ticksToSteps(DEPLOY_TIME_TICKS));   // Match::step is 100 ms
         // Not one tile of movement while deploying.
         REQUIRE(placed.distanceTo(e->position) == Catch::Approx(0.0f).margin(1e-4));
     }
@@ -251,7 +251,7 @@ TEST_CASE("Skeletons are separated by collision while deploying, not moved by ch
         if (e->cardId == SKELETONS && e->team == 0) placed.push_back(e->position);
     REQUIRE(placed.size() == 3);
 
-    m.step(DEPLOY_TIME_TICKS);
+    m.step(ticksToSteps(DEPLOY_TIME_TICKS));   // Match::step is 100 ms
 
     size_t i = 0;
     for (const auto& e : m.game.getBoard().getEntities()) {
@@ -471,7 +471,7 @@ TEST_CASE("a Cannon expires at exactly its lifetime, not one second late",
     auto cannon = findByCard(board, CANNON, 0);
     REQUIRE(cannon);
 
-    constexpr int LIFETIME_TICKS = 300; // Building's own default, 30s at 10 ticks/s
+    constexpr int LIFETIME_TICKS = secs(30.0); // Building's own default, 30 s (tickBoard is one engine tick)
     for (int t = 1; t < LIFETIME_TICKS; ++t) tickBoard(board, t);
     REQUIRE(cannon->isAlive()); // still standing one tick short of expiry
 

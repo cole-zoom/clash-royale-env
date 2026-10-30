@@ -55,7 +55,7 @@ struct UnitView {
     bool building;
     bool tower;
     bool targetable;   // false for spells in flight and projectiles
-    int deployTicks;   // ticks of deploy time left (0 for non-combat entities)
+    int deployTicks;   // deploy time left in API steps (100 ms), rounded up (0 for non-combat entities)
     int targetId;      // the entity it is locked onto, -1 for none
 };
 
@@ -84,7 +84,7 @@ public:
     static constexpr int CH_COUNT = 9;    // 9 ally / 10 enemy: units per cell
     static constexpr int CH_FLYING = 11;  // 11 / 12: any flyer here
     static constexpr int CH_ANTIAIR = 13; // 13 / 14: can hit air
-    static constexpr int CH_DPS = 15;     // 15 / 16: damage per tick
+    static constexpr int CH_DPS = 15;     // 15 / 16: damage per 100 ms step
     static constexpr int CH_RANGE = 17;   // 17 / 18: attack range
     static constexpr int CH_SPEED = 19;   // 19 / 20: move speed
     static constexpr int NUM_CHANNELS = 21;
@@ -130,8 +130,9 @@ public:
     // needs no normalisation and answers "can it be back yet?" directly.
     static constexpr int NUM_CYCLE_BLOCKS = 2;
     static constexpr int CYCLE_BLOCK_SIZE = NUM_CYCLE_BLOCKS * NUM_CARD_IDS;
-    // 200 ticks = 20 s, about one 8-card rotation: half a cycle ago reads
-    // ~0.61, a full cycle ~0.37.
+    // 200 steps = 20 s, about one 8-card rotation: half a cycle ago reads
+    // ~0.61, a full cycle ~0.37. In API steps (100 ms), as the clock it is
+    // compared against (currentTick), not engine ticks (Tick.h).
     static constexpr float CYCLE_RECENCY_TAU_TICKS = 200.0f;
 
     // --- named offsets into the observation ---
@@ -254,12 +255,14 @@ private:
 
             if (const auto* combat = dynamic_cast<const CombatEntity*>(entity.get())) {
                 if (combat->targetsAir) putMax(CH_ANTIAIR, 1.0f);
-                // Per tick, not per attack.
-                putMax(CH_DPS, combat->getDamagePerTick() / MAX_UNIT_DPS);
+                // Per 100 ms step, not per attack: the channel's unit since
+                // it was added, whatever the engine tick (Tick.h).
+                putMax(CH_DPS, combat->getDamagePerTick() * TICKS_PER_STEP / MAX_UNIT_DPS);
                 putMax(CH_RANGE, combat->getAttackRange() / MAX_ATTACK_RANGE);
             }
             if (const auto* troop = dynamic_cast<const Troop*>(entity.get())) {
-                putMax(CH_SPEED, troop->getSpeed() / MAX_UNIT_SPEED);
+                // Tiles per 100 ms step, as above.
+                putMax(CH_SPEED, troop->getSpeed() * TICKS_PER_STEP / MAX_UNIT_SPEED);
             }
         }
 
@@ -323,7 +326,7 @@ private:
         const int now = currentTick;
         for (int block = 0; block < NUM_CYCLE_BLOCKS; ++block) {
             for (int cardId = 0; cardId < NUM_CARD_IDS; ++cardId) {
-                const int last = game.getLastPlayedTick(opponent, cardId);
+                const int last = getLastPlayedTick(opponent, cardId);   // API steps
                 if (last < 0) {
                     // Never played: both blocks 0. seen=0 means "no
                     // information"; seen=1 with recency ~0 means "they have it,
@@ -470,6 +473,8 @@ public:
         float totalReward = 0.0f;
         bool isDone = false;
 
+        // One frame = one GameManager::step = 100 ms of game time (TICKS_PER_STEP engine ticks, Tick.h); currentTick
+        // and logger ticks count frames.
         for (int i = 0; i < skipFrames; ++i) {
             if (i == 0 && cardIndex >= 0 && cardIndex < 4) {
                 const auto& hand = game.getHand(0);
@@ -607,7 +612,7 @@ public:
     // The general form of injectEnemy, for state estimation: spawns directly,
     // bypassing hand, elixir and placement legality, since the real game
     // already validated the placement. hp < 0 keeps full health; deployTicks <
-    // 0 keeps DEPLOY_TIME_TICKS.
+    // 0 keeps DEPLOY_TIME_TICKS. deployTicks is in API steps (100 ms).
     //
     // Pass deployTicks = 0 for a unit perception can already see:
     // applyCardMetadata otherwise hands every injected unit a fresh deploy
@@ -635,7 +640,7 @@ public:
             }
             if (deployTicks >= 0) {
                 if (auto* combat = dynamic_cast<CombatEntity*>(e.get())) {
-                    combat->deployTicksRemaining = deployTicks;
+                    combat->deployTicksRemaining = stepsToTicks(deployTicks);
                 }
             }
         }
@@ -656,8 +661,9 @@ public:
     // --- tower HP and the match clock (item 22) ---
     // Thin wrappers; the contracts live on GameManager.
     bool setTowerHp(int team, int slot, float hp) { return game.setTowerHp(team, slot, hp); }
+    // cooldownTicks in API steps (100 ms).
     bool setTowerStats(int team, int slot, int maxHp, int damage, int cooldownTicks) {
-        return game.setTowerStats(team, slot, maxHp, damage, cooldownTicks);
+        return game.setTowerStats(team, slot, maxHp, damage, stepsToTicks(cooldownTicks));
     }
     bool destroyTower(int team, int slot) { return game.destroyTower(team, slot); }
     bool wakeKing(int team) { return game.wakeKing(team); }
@@ -667,10 +673,11 @@ public:
 
     // The one field nothing else reconstructs. Clamped to [0, maxTicks]. Sets
     // both clocks: this one drives the time scalar and the done condition,
-    // GameManager's the event stamps and ability cooldowns.
+    // GameManager's the event stamps and ability cooldowns. In API steps
+    // (100 ms); GameManager's clock is in engine ticks (Tick.h).
     void setCurrentTick(int tick) {
         currentTick = std::max(0, std::min(tick, maxTicks));
-        game.setCurrentTick(currentTick);
+        game.setCurrentTick(stepsToTicks(currentTick));
     }
 
     // The matching read.
@@ -684,7 +691,7 @@ public:
             UnitView u{e->id, e->cardId, e->name, e->team, e->position.x, e->position.y, e->hp,
                        e->isFlying, e->isBuilding(), e->isTower(), e->isTargetable(), 0, -1};
             if (const auto* c = dynamic_cast<const CombatEntity*>(e.get())) {
-                u.deployTicks = c->deployTicksRemaining;
+                u.deployTicks = ticksToStepsCeil(c->deployTicksRemaining);
                 u.targetId = c->getCurrentTargetId();
             }
             out.push_back(std::move(u));
@@ -709,9 +716,11 @@ public:
     }
 
     // The raw tick behind the recency channel, so a test can check what was
-    // recorded separately from how it is encoded.
+    // recorded separately from how it is encoded. In API steps (100 ms); -1
+    // for never.
     int getLastPlayedTick(int team, int cardId) const {
-        return game.getLastPlayedTick(team, cardId);
+        const int last = game.getLastPlayedTick(team, cardId);
+        return last < 0 ? -1 : ticksToSteps(last);
     }
 
     // Reproducibility: same seed, same opening hands, cycle order and heuristic

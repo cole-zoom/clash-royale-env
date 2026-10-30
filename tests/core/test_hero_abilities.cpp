@@ -55,7 +55,7 @@ TEST_CASE("Hero Musketeer (168) is registered with base Musketeer's stats and a 
     REQUIRE(hero->hp == 721); // base Musketeer hp (id 6)
     REQUIRE(hero->sightRange == Catch::Approx(6.0f));
     REQUIRE(hero->abilityElixirCost == Catch::Approx(3.0f));
-    REQUIRE(hero->abilityCooldownTicks == 220);
+    REQUIRE(hero->abilityCooldownTicks == secs(22.0));
     REQUIRE(hero->abilityUsesRemaining == -1); // unlimited, gated by cooldown and elixir
 }
 
@@ -163,7 +163,7 @@ TEST_CASE("Hero Knight (166) is registered with base Knight's stats and the Taun
     REQUIRE(hero != nullptr);
     REQUIRE(hero->hp == 1766); // base Knight hp (id 0)
     REQUIRE(hero->abilityElixirCost == Catch::Approx(2.0f));
-    REQUIRE(hero->abilityCooldownTicks == 250);
+    REQUIRE(hero->abilityCooldownTicks == secs(25.0));
 }
 
 TEST_CASE("HeroKnightTauntEffect forces nearby enemies to retarget and grants an expiring shield",
@@ -241,7 +241,7 @@ TEST_CASE("Hero Wizard (167) is registered with base Wizard's stats and the Fier
     REQUIRE(hero->hp == 755); // base Wizard hp (id 11)
     REQUIRE(hero->splashRadius == Catch::Approx(1.5f));
     REQUIRE(hero->abilityElixirCost == Catch::Approx(1.0f));
-    REQUIRE(hero->abilityCooldownTicks == 200);
+    REQUIRE(hero->abilityCooldownTicks == secs(20.0));
     REQUIRE_FALSE(hero->isFlying); // not yet activated
 }
 
@@ -334,7 +334,7 @@ TEST_CASE("Hero Giant (169) is registered with base Giant's stats and the Heroic
     REQUIRE(hero != nullptr);
     REQUIRE(hero->hp == 3968); // base Giant hp (id 2)
     REQUIRE(hero->abilityElixirCost == Catch::Approx(2.0f));
-    REQUIRE(hero->abilityCooldownTicks == 140);
+    REQUIRE(hero->abilityCooldownTicks == secs(14.0));
 }
 
 TEST_CASE("HeroGiantHurlEffect throws the highest-HP enemy in range across the lane and stuns it",
@@ -371,7 +371,7 @@ TEST_CASE("Hero Mega Minion (173) is registered with base Mega Minion's stats, a
     REQUIRE(hero->isFlying);
     REQUIRE(hero->abilityElixirCost == Catch::Approx(2.0f));
     REQUIRE(hero->abilityUsesRemaining == 1);
-    REQUIRE(hero->abilityCooldownRemaining == 15); // post-spawn lockout, seeded by applyCardMetadata
+    REQUIRE(hero->abilityCooldownRemaining == secs(1.5)); // post-spawn lockout, seeded by applyCardMetadata
 }
 
 TEST_CASE("HeroMegaMinionWarpEffect teleports to the lowest-HP enemy anywhere and deals bonus damage",
@@ -407,7 +407,7 @@ TEST_CASE("Hero Magic Archer (171) is registered with base Magic Archer's stats 
     REQUIRE(hero != nullptr);
     REQUIRE(hero->hp == 529); // base Magic Archer hp (id 63)
     REQUIRE(hero->abilityElixirCost == Catch::Approx(2.0f));
-    REQUIRE(hero->abilityCooldownTicks == 250);
+    REQUIRE(hero->abilityCooldownTicks == secs(25.0));
     REQUIRE(hero->maxSplitTargets == 1); // not yet activated
 }
 
@@ -480,7 +480,7 @@ TEST_CASE("Hero Ice Golem (175) is registered with base Ice Golem's stats and th
     REQUIRE(hero != nullptr);
     REQUIRE(hero->hp == 1315); // base Ice Golem hp (id 40)
     REQUIRE(hero->abilityElixirCost == Catch::Approx(2.0f));
-    REQUIRE(hero->abilityCooldownTicks == 170);
+    REQUIRE(hero->abilityCooldownTicks == secs(17.0));
 }
 
 TEST_CASE("HeroIceGolemSnowstormEffect's first blast damages/slows, discounting Tower damage",
@@ -527,7 +527,8 @@ TEST_CASE("HeroIceGolemSnowstormEffect's third blast fully freezes instead of sl
     }
     REQUIRE(blasts.size() == 3);
 
-    for (int i = 0; i < 11; ++i) blasts[2]->update(board); // delayTicks=10: needs 11 calls to fire
+    // the third blast's delay is two 0.5 s stage gaps (STAGE_GAP_TICKS); an AreaSpell fires on the call after
+    for (int i = 0; i < 2 * secs(0.5) + 1; ++i) blasts[2]->update(board);
     REQUIRE(enemyTroop->freezeTicks == 15);
     REQUIRE(enemyTroop->freezeSlow == Catch::Approx(0.0f)); // full freeze, not a partial slow
 }
@@ -559,15 +560,15 @@ TEST_CASE("Hero Barbarian Barrel (174) is registered as isHero, and spawns a Her
     def->spawnEntity(5.0f, 5.0f, 0, board);
     board.commitPendingEntities();
 
-    // The Barbarian spawns where the barrel stops rolling: 8 delay ticks plus
-    // 4.5 tiles at 0.5 tiles/tick, so 17 ticks at minimum; 20 leaves margin.
+    // The Barbarian spawns where the barrel stops rolling: a 0.8 s delay plus
+    // 4.5 tiles at 5 tiles/s, so 1.7 s at minimum; 2.0 s leaves margin.
     std::shared_ptr<AreaSpell> spell;
     for (const auto& e : board.getEntities()) {
         spell = std::dynamic_pointer_cast<AreaSpell>(e);
         if (spell) break;
     }
     REQUIRE(spell != nullptr);
-    for (int i = 0; i < 20; ++i) spell->update(board);
+    for (int i = 0; i < secs(2.0); ++i) spell->update(board);
     board.commitPendingEntities();
 
     std::shared_ptr<CombatEntity> barbarian;
@@ -595,7 +596,7 @@ TEST_CASE("Hero Goblins (172) is registered with base Goblins' stats and no aliv
     REQUIRE(def->isHero);
     REQUIRE_FALSE(def->isChampion);
     REQUIRE(def->abilityElixirCost == Catch::Approx(1.0f));
-    REQUIRE(def->abilityUsableAfterDeathTicks == 70);
+    REQUIRE(def->abilityUsableAfterDeathTicks == secs(7.0));
     REQUIRE(def->postDeathAbilityEffect != nullptr);
 
     def->spawnEntity(5.0f, 5.0f, 0, board);

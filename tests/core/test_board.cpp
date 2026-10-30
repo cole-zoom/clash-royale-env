@@ -124,12 +124,12 @@ TEST_CASE("resolvePositionAgainstBuildings leaves a position untouched when far 
 TEST_CASE("resolvePositionAgainstBuildings pushes a position out of a building's radius", "[board][collision]") {
     Board board;
     // radius 1.0, minDist 1.4. Input 0.5 above the centre: push 1.4 - 0.5 =
-    // 0.9, plus the 0.05 perpendicular slide.
+    // 0.9, plus the perpendicular slide (0.05 per 100 ms, per tick: SLIDE_PER_TICK).
     auto building = std::make_shared<Building>(1, 10.0f, 10.0f, 1000, 1, 'C', 5.0f, 10, 10);
     spawn(board, building);
 
     Vector2D resolved = board.resolvePositionAgainstBuildings(Vector2D{ 10.0f, 10.5f }, 999);
-    REQUIRE(resolved.x == Catch::Approx(10.05f));
+    REQUIRE(resolved.x == Catch::Approx(10.0f + Board::SLIDE_PER_TICK));
     REQUIRE(resolved.y == Catch::Approx(11.4f));
 }
 
@@ -622,6 +622,6 @@ TEST_CASE("pushAwayFrom clears the full radius even from dead centre",
         const Vector2D near{ 5.5f, 5.0f };
         const Vector2D out = Board::pushAwayFrom(near, centre, 1.4f);
         REQUIRE(out.x == Catch::Approx(6.4f));
-        REQUIRE(out.y == Catch::Approx(4.95f));
+        REQUIRE(out.y == Catch::Approx(5.0f - Board::SLIDE_PER_TICK));
     }
 }

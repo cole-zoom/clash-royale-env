@@ -105,7 +105,7 @@ public:
             if (trigger) {
                 // WaitForKingTowerActivation -> ActionDuration (king_tower.toml): 3.3 s from the trigger to the first
                 // possible shot. The first tick of it is this one.
-                const int ticks = Fidelity::kingActivationDelay ? (CLIENT_KING_ACTIVATION_MS + 50) / 100 : 0;
+                const int ticks = Fidelity::kingActivationDelay ? msToTicks(CLIENT_KING_ACTIVATION_MS) : 0;
                 if (ticks <= 0) awake = true;
                 else activationTicksLeft = ticks - 1;
             }
@@ -131,9 +131,10 @@ protected:
 
 public:
     // TowerPrincessProjectile 600 / KingProjectile 1000 (client units, the troop Speed conversion) under
-    // Fidelity::clientProjectiles; 2.0 tiles a tick before. A Tower Troop with its own client projectile keeps it.
+    // Fidelity::clientProjectiles; 2.0 tiles per 100 ms (20 a second) before. A Tower Troop with its own client
+    // projectile keeps it.
     float towerShotSpeed() const {
-        if (!Fidelity::clientProjectiles) return 2.0f;
+        if (!Fidelity::clientProjectiles) return perTick(20.0f);
         if (clientShotSpeed > 0.0f) return clientShotSpeed;
         const int s = (symbol == 'R') ? CLIENT_KING_TOWER_PROJECTILE_SPEED : CLIENT_PRINCESS_TOWER_PROJECTILE_SPEED;
         return s * REAL_TILES_PER_MIN_TO_ENGINE * MOVEMENT_SPEED_SCALE;

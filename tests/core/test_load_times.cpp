@@ -51,12 +51,12 @@ int firstHit(int card, bool on, int model) {
 TEST_CASE("load times come from the client: Knight 700 ms of 1200, Valkyrie 1400 of 1500", "[load_time]") {
     REQUIRE(CombatEntity::loadTimesEnabled);                                  // on by default
     REQUIRE(CombatEntity::loadModel == CombatEntity::LOAD_MODEL_PRELOAD);     // the game's model by default
-    REQUIRE(loadTicksForCard(0) == 7);
-    REQUIRE(firstHitTicksForCard(0) == 5);                                    // 1200 - 700
-    REQUIRE(loadTicksForCard(10) == 14);
-    REQUIRE(firstHitTicksForCard(10) == 1);                                   // 1500 - 1400
-    REQUIRE(firstHitTicksForCard(15) == 6);                                   // Hog Rider 1600 - 1000
-    REQUIRE(firstHitTicksForCard(6) == 7);                                    // Musketeer 1000 - 300
+    REQUIRE(loadTicksForCard(0) == msToTicks(700));
+    REQUIRE(firstHitTicksForCard(0) == msToTicks(1200 - 700));                                    // 1200 - 700
+    REQUIRE(loadTicksForCard(10) == msToTicks(1400));
+    REQUIRE(firstHitTicksForCard(10) == msToTicks(1500 - 1400));                                   // 1500 - 1400
+    REQUIRE(firstHitTicksForCard(15) == msToTicks(1600 - 1000));                                   // Hog Rider 1600 - 1000
+    REQUIRE(firstHitTicksForCard(6) == msToTicks(1000 - 300));                                    // Musketeer 1000 - 300
     REQUIRE(firstHitTicksForCard(28) == -1);                                  // Inferno Tower: load is its lock-on
     REQUIRE(loadTicksForCard(3) == 0);                                        // Arrows: a spell
     REQUIRE(firstHitTicksForCard(3) == -1);

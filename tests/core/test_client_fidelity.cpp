@@ -122,15 +122,15 @@ TEST_CASE("units fire their client projectile speed; towers theirs", "[client_me
     REQUIRE(musketeer->shotHoming());
     REQUIRE(bomber->shotSpeed(1.5f) == Catch::Approx(400 * CONV));
     REQUIRE_FALSE(bomber->shotHoming());
-    Tower princess(50, 3.0f, 26.0f, 3052, 0, 7.5f, 109, 8, 'P');
-    Tower king(51, 9.0f, 29.0f, 4824, 0, 7.0f, 109, 10, 'R');
+    Tower princess(50, 3.0f, 26.0f, 3052, 0, 7.5f, 109, secs(0.8), 'P');
+    Tower king(51, 9.0f, 29.0f, 4824, 0, 7.0f, 109, secs(1.0), 'R');
     REQUIRE(princess.towerShotSpeed() == Catch::Approx(600 * CONV));
     REQUIRE(king.towerShotSpeed() == Catch::Approx(1000 * CONV));
     NoClientProjectiles legacy;
     REQUIRE(musketeer->shotSpeed(1.5f) == Catch::Approx(1.5f));
     REQUIRE(musketeer->shotHoming());
     REQUIRE(bomber->shotHoming());
-    REQUIRE(princess.towerShotSpeed() == Catch::Approx(2.0f));
+    REQUIRE(princess.towerShotSpeed() == Catch::Approx(perTick(20.0f)));   // 2.0 tiles per 100 ms
 }
 
 TEST_CASE("a Cannon's shot flies (TowerCannonball 1000) instead of hitting at once", "[client_mechanics][projectile]") {
@@ -209,8 +209,8 @@ TEST_CASE("the King shoots 3.3 s after its trigger, not at once", "[client_mecha
     king->takeDamage(1);
     king->update(board);                                   // the trigger
     REQUIRE(king->isActivating());
-    for (int i = 0; i < 32; ++i) king->update(board);
-    REQUIRE_FALSE(king->isAwake());                        // 3.2 s after
+    for (int i = 0; i < secs(3.3) - 1; ++i) king->update(board);
+    REQUIRE_FALSE(king->isAwake());                        // one tick short of 3.3 s after
     king->update(board);
     REQUIRE(king->isAwake());                              // 3.3 s after
 

@@ -22,7 +22,7 @@ inline CardStats spiritEmpressGroundStats() {
     stats.speed = SPEED_FAST * MOVEMENT_SPEED_SCALE;
     stats.attackRange = 1.2f;
     stats.damage = 320;
-    stats.attackCooldown = 12;
+    stats.attackCooldown = secs(1.2);
     stats.symbol = '<';
     return stats;
 }
@@ -38,7 +38,7 @@ inline CardStats spiritEmpressFlyingStats() {
     stats.speed = SPEED_MEDIUM * MOVEMENT_SPEED_SCALE;
     stats.attackRange = 5.0f;
     stats.damage = 320;
-    stats.attackCooldown = 14;
+    stats.attackCooldown = secs(1.4);
     stats.symbol = '<';
     stats.isFlying = true;
     stats.targetsAir = true;

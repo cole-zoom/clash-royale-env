@@ -20,7 +20,7 @@ struct Fidelity {
     static inline bool aoeLandsWithoutTarget = true;
     // EXTRA_SIGHT_RANGE_TO_CROWN_TOWERS (2000): troops see crown towers 2 tiles further than their SightRange.
     static inline bool crownTowerSightBonus = true;
-    // Each unit's projectile Speed and Homing from the client (was 1.5 tiles a tick for troops, 2.0 for towers,
+    // Each unit's projectile Speed and Homing from the client (was 1.5 tiles per 100 ms for troops, 2.0 for towers,
     // every shot homing; buildings hit at once). Non-homing area shots land where the target stood at launch.
     static inline bool clientProjectiles = true;
     // Each unit's CollisionRadius and Mass from the client (was 0.4 for every troop, 1.0 for every building, 1.5 /
@@ -66,15 +66,15 @@ struct Fidelity {
     // default: Cole's "fires right away" against the code; lab L18 decides.
     static inline bool princessFirstShotDelay = false;
     // Elixir at the client's rate (battle_timelines Default: 28 s / 14 s / 9.3 s a bar, i.e. 2.8 s an elixir at 1x)
-    // instead of 0.035 a tick (2.857 s). OFF by default: perception's opponent-elixir tracker assumes the engine's
+    // instead of 0.035 per 100 ms (2.857 s). OFF by default: perception's opponent-elixir tracker assumes the engine's
     // rate; for Cole to decide.
     static inline bool clientElixirRate = false;
 
     // ---- Unit collision as the client's code runs it (separation 0x71fff6058c, move step 0x71fff60bd4; notes §5) ----
     // Each troop pushes only itself, in entity order, before its own step, and the next troop sees where it went.
     // Per neighbour on its layer: overlap clamped to 0.3, times the neighbour's Mass / its own (capped 0.299), + 0.001;
-    // averaged over contacts and capped at 0.15 a 50 ms tick, two passes a 100 ms tick with the step split between
-    // them (Board::clientSelfPush). Units deploying, dashing, winding up a special, or jumping the river (JumpEnabled
+    // averaged over contacts and capped at 0.15 a 50 ms tick (one engine tick, Tick.h), applied together with the
+    // troop's own step (Board::clientMoveStep, clientSelfPush). Units deploying, dashing, winding up a special, or jumping the river (JumpEnabled
     // troops over river cells, at JumpSpeed) neither push nor are pushed. A push may carry a centre into the first
     // river cell, where moves clamp per cell and a 0.256 nudge a tick takes it back to the bank (Board::clientRiverMove).
     // Buildings keep the engine's static push-out. OFF by default: off = Board::resolveCollisions (pairwise split

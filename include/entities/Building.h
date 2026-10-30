@@ -15,7 +15,7 @@ public:
     static constexpr float COLLISION_RADIUS = 1.0f;
 
     Building(int id, float x, float y, int hp, int team, char symbol,
-        float attackRange, int damage, int attackCooldown, int lifetime = 300)
+        float attackRange, int damage, int attackCooldown, int lifetime = secs(30.0))
         : CombatEntity(id, x, y, hp, team, symbol, attackRange, damage, attackCooldown),
         maxHp(hp), lifetimeTicks(lifetime) {}
 
@@ -52,9 +52,9 @@ public:
             if (ticksAlive >= lifetimeTicks) {
                 hp = 0;
                 board.statsEvents.notifyAttributionCleared({ id });
-            } else if (ticksAlive % 10 == 0) { // every 10 ticks
-                int decayIntervals = lifetimeTicks / 10;
-                if (decayIntervals <= 0) decayIntervals = 1; // lifetimes under 10 ticks
+            } else if (ticksAlive % secs(1.0) == 0) { // every second
+                int decayIntervals = lifetimeTicks / secs(1.0);
+                if (decayIntervals <= 0) decayIntervals = 1; // lifetimes under a second
                 int decayAmount = maxHp / decayIntervals;
                 if (decayAmount <= 0) decayAmount = 1;
                 takeDamage(decayAmount);

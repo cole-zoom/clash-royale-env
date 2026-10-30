@@ -17,14 +17,17 @@
 
 namespace {
 
-// GameManager::step()'s board half, in its order.
+// GameManager::step()'s board half, in its order: one 100 ms step, TICKS_PER_STEP engine ticks (Tick.h), so `tick`
+// counts tenths of a second as the loops below were written.
 void tickBoard(Board& board, int tick) {
-    board.currentTick = tick;
-    board.commitPendingEntities(tick);
-    for (const auto& e : board.getEntities()) if (e->isAlive()) e->update(board);
-    board.commitPendingEntities(tick);
-    board.resolveCollisions();
-    board.cleanDeadEntities(tick);
+    for (int k = 0; k < TICKS_PER_STEP; ++k) {
+        board.currentTick = tick;
+        board.commitPendingEntities(tick);
+        for (const auto& e : board.getEntities()) if (e->isAlive()) e->update(board);
+        board.commitPendingEntities(tick);
+        board.resolveCollisions();
+        board.cleanDeadEntities(tick);
+    }
 }
 
 std::shared_ptr<CombatEntity> spawnCard(Board& board, int cardId, float x, float y, int team) {
@@ -58,7 +61,7 @@ TEST_CASE("Hunter point-blank: all 10 pellets of 84 land, 840", "[client_mechani
     Board board;
     auto target = dummyTarget(board, 9.0f, 6.0f, 1);
     spawnCard(board, 62, 9.0f, 5.0f, 0);
-    for (int t = 0; t < 40; ++t) tickBoard(board, t);  // one volley: deploy 10 + load 15, next at +22
+    for (int t = 0; t < 30; ++t) tickBoard(board, t);  // one volley (3.0 s): deploy 1.0 s, first hit 0.7 s later, next 2.2 s after
     REQUIRE(100000 - target->hp == 840);
 }
 
@@ -218,7 +221,7 @@ TEST_CASE("Three Musketeers are three Elite Musketeers: 906 hp, 204 shot, 314 ba
     REQUIRE(s != nullptr);
     REQUIRE(s->hp == 906);
     REQUIRE(s->damage == 204);
-    REQUIRE(s->attackCooldown == 13);
+    REQUIRE(s->attackCooldown == secs(1.3));
     REQUIRE(s->attackRange == Catch::Approx(6.0f));
     REQUIRE(s->meleeAltRange == Catch::Approx(1.6f));
     REQUIRE(s->meleeAltDamage == 314);

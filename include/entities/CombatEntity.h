@@ -8,6 +8,7 @@
 #include "PeriodicEffect.h"
 #include "AbilityEffect.h"
 #include "ClientMechanics.h"
+#include "Tick.h"
 #include <unordered_map>
 #include <memory>
 #include <limits>
@@ -157,14 +158,14 @@ public:
 
     // ---- The client attack cycle (Fidelity::reloadFromAttackStart and the switches after it; bot-77
     // docs/client-code-notes.md section 1: combat update 0x71fff599e4, timer advance 0x71fff5ac3c, set target
-    // 0x71fff558e0, target removed 0x71fff591f8). Times in ms; the engine steps 100 ms a tick where the client
-    // steps 50. ----
+    // 0x71fff558e0, target removed 0x71fff591f8). Times in ms; the engine steps TICK_MS (50 ms) a tick, as the
+    // client does. ----
     // LoadTime for the cycle (LoadTimes.h loadMsForCard; crown towers: GameManager); -1 = not on the cycle.
     int clientLoadMs = -1;
-    // Runs while attacking, by 100 ms x the hit-speed factor a tick; a hit lands each time it crosses a multiple
+    // Runs while attacking, by TICK_MS x the hit-speed factor a tick; a hit lands each time it crosses a multiple
     // of the hit speed. 0 = not attacking; an attack starts at clientLoadMs - loadMissingMs.
     int attackTimerMs = 0;
-    // Load still missing: counts down 100 ms every tick whatever the unit does; set to the full load when an
+    // Load still missing: counts down TICK_MS every tick whatever the unit does; set to the full load when an
     // attack starts.
     int loadMissingMs = 0;
     // An attack is under way (the client's attack timer is non-zero; here a start at 0 counts too).
@@ -701,8 +702,8 @@ public:
         moveSlowThisTick = (moveSlowTicks > 0) ? moveSlowFactor : 1.0f;
         if (moveSlowTicks > 0 && --moveSlowTicks == 0) moveSlowFactor = 1.0f;
         ticksSinceLastHit++; // zeroed below when a hit lands
-        // The client cycle's load: 100 ms a tick, unscaled, whatever the unit is doing.
-        if (loadMissingMs > 0) loadMissingMs = std::max(0, loadMissingMs - 100);
+        // The client cycle's load: TICK_MS a tick, unscaled, whatever the unit is doing.
+        if (loadMissingMs > 0) loadMissingMs = std::max(0, loadMissingMs - TICK_MS);
         if (ticksSinceAttack < TICKS_SINCE_ATTACK_NEVER) ticksSinceAttack++; // zeroed when an attack starts
 
         if (transformAtHpFraction > 0.0f && !hasTransformed && transformCheckMaxHp > 0
@@ -849,7 +850,7 @@ public:
             float effectiveAttackRange = effectiveRangeTo(target);
 
             const bool hitStarted = usesPreload() && windupTargetId == target->id && windupTicksLeft > 0;
-            const int hookStepMs = stunned ? 0 : static_cast<int>(std::lround(100.0f * slowThisTick));
+            const int hookStepMs = stunned ? 0 : static_cast<int>(std::lround(static_cast<float>(TICK_MS) * slowThisTick));
             if (specialTargetId >= 0 && specialTargetId != target->id) { specialTargetId = -1; specialLoadLeftMs = 0; }
             if (specialTargetId == target->id && specialLoadLeftMs > 0) {
                 hookStep(target, dist, effectiveAttackRange, hookStepMs);  // the hook is winding up: stand
@@ -1078,7 +1079,7 @@ public:
         return swingStarted && hasClientProjectile() && d <= reach + CLIENT_PRESERVE_TARGET_IF_HIT_STARTED_RANGE / 1000.0f;
     }
 
-    // The attack timer's step this tick: 100 ms x the hit-speed factor (a freeze's slow, 0 when stunned; the haste
+    // The attack timer's step this tick: TICK_MS x the hit-speed factor (a freeze's slow, 0 when stunned; the haste
     // of the Cloaking Cape / Getaway Grenade, Blade Rage, Little Prince's ramp, which the preload model applies to
     // its cooldown instead).
     int clientCycleStepMs(bool wasFrozen, bool stunned, float slowThisTick) const {
@@ -1087,12 +1088,12 @@ public:
         if (hitSpeedRampFullTick > 0) rate /= hitSpeedRampFraction();
         if (temporaryInvisibilityTicksRemaining > 0 && temporaryHitSpeedMultiplier > 0.0f) rate /= temporaryHitSpeedMultiplier;
         if (selfHasteTicksRemaining > 0 && selfHasteCooldownMultiplier > 0.0f) rate /= selfHasteCooldownMultiplier;
-        return std::max(0, static_cast<int>(std::lround(100.0f * rate)));
+        return std::max(0, static_cast<int>(std::lround(static_cast<float>(TICK_MS) * rate)));
     }
 
     // One tick of targeting and attacking under the client's cycle (replaces the preload model's part of update()).
     void updateClientCycle(Board& board, bool wasFrozen, bool stunned, float slowThisTick) {
-        const int hitSpeedMs = std::max(1, attackCooldown) * 100;
+        const int hitSpeedMs = std::max(1, attackCooldown) * TICK_MS;
         const bool pauses = Fidelity::stunPausesSwing;
         // Sparky (LoadFirstHit, LOGIC_LOAD_FIRST_HIT_RESET_TIMER_WHEN_ZAPPED): each stunned tick empties her load.
         if (stunned && loadFirstHit) {
@@ -1130,7 +1131,7 @@ public:
                         target = cand;  // keeps the cycle
                         finishWindowMs = 0;
                     } else {
-                        finishWindowMs += 100;
+                        finishWindowMs += TICK_MS;
                         if (finishWindowMs >= CLIENT_ATTACK_FINISH_TIME_MS) {
                             resetSwing();  // the swing is lost; the load keeps counting
                             target = cand;
@@ -1188,9 +1189,11 @@ public:
             // LoadTime minus the missing load into its cycle, and the load is reset to full at that start.
             if (stepMs > 0) {
                 // The client steps the new attack's timer in the update that starts it (50 ms), so its first hit
-                // comes HitSpeed - LoadTime - 50 ms after that update; at 100 ms a tick the engine can only land it
-                // 100 ms early or on time, and keeps the preload model's on-time (HitSpeed - LoadTime after the
-                // start tick), which the 10-29 replay check of the Hog's first tower hit supports.
+                // comes HitSpeed - LoadTime - 50 ms after that update. The engine keeps the preload model's on-time
+                // (HitSpeed - LoadTime after the start tick), chosen when it ran 100 ms ticks (it could only land the
+                // hit 100 ms early or on time) and supported by the 10-29 replay check of the Hog's first tower hit.
+                // At 50 ms the client's form is expressible (step the timer in the start tick too); not changed with
+                // the tick (2026-10-29), so the tick change alone moves no first hit.
                 // A seeded hold (X-Bow's 3.5 s deploy delay, seedCooldown) or a jump / hook's cooldown delays the
                 // start, as in the preload model. Not Sparky's spawn seed: her unloaded start is loadMissingMs here.
                 const bool starting = !attacking;

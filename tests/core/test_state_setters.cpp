@@ -238,7 +238,7 @@ TEST_CASE("an injected wound wakes the King, exactly as real damage would",
     king->update(board);
     // ...after the client's activation (Fidelity::kingActivationDelay: 3.3 s from the trigger)
     REQUIRE(king->isActivating());
-    for (int i = 0; i < (CLIENT_KING_ACTIVATION_MS + 50) / 100; ++i) king->update(board);
+    for (int i = 0; i < msToTicks(CLIENT_KING_ACTIVATION_MS); ++i) king->update(board);
     REQUIRE(king->isAwake());
 }
 
@@ -249,7 +249,7 @@ TEST_CASE("setTowerHp back to full does NOT re-sleep a woken King",
     Tower* king = towerAt(board, 0, 0);
 
     REQUIRE(game.setTowerHp(0, 0, static_cast<float>(game.getTowerMaxHp(0, 0)) - 1.0f));
-    for (int i = 0; i <= (CLIENT_KING_ACTIVATION_MS + 50) / 100; ++i) king->update(board);  // the trigger, then its activation
+    for (int i = 0; i <= msToTicks(CLIENT_KING_ACTIVATION_MS); ++i) king->update(board);  // the trigger, then its activation
     REQUIRE(king->isAwake());
 
     // The flag latches: neither a heal nor a sensor misreading full health
@@ -287,7 +287,7 @@ TEST_CASE("destroying a Princess wakes that team's King and not the other's",
 
     REQUIRE(game.destroyTower(1, 1) == true);
 
-    for (int i = 0; i <= (CLIENT_KING_ACTIVATION_MS + 50) / 100; ++i) {  // the trigger, then its activation
+    for (int i = 0; i <= msToTicks(CLIENT_KING_ACTIVATION_MS); ++i) {  // the trigger, then its activation
         theirs->update(board);
         ours->update(board);
     }
@@ -445,8 +445,9 @@ TEST_CASE("setCurrentTick keeps ClashEnv's clock and GameManager's in step",
 
     // Both clocks move together: ClashEnv's drives the observation and done
     // condition, GameManager's the cooldowns and event stamps.
-    env.setCurrentTick(742);
-    REQUIRE(env.debugGame().getCurrentTick() == 742);
+    env.setCurrentTick(742);   // API steps (100 ms)
+    REQUIRE(env.getCurrentTick() == 742);
+    REQUIRE(env.debugGame().getCurrentTick() == stepsToTicks(742));   // engine ticks
 }
 
 TEST_CASE("the item 22 setters survive a snapshot", "[setters][snapshot]") {

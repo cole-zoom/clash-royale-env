@@ -45,12 +45,16 @@ std::shared_ptr<DummyEntity> dummy(Board& board, int id, float x, float y, int h
     return d;
 }
 
-// One tick of the board without collisions (positions stay where the test puts them).
+// One 100 ms step of the board (TICKS_PER_STEP engine ticks, Tick.h) without collisions (positions stay where the
+// test puts them). `t` counts steps, so the tick numbers below are tenths of a second, as they were written.
 void tick(Board& board, int t) {
-    board.currentTick = t;
-    for (const auto& e : board.getEntities()) if (e->isAlive()) e->update(board);
-    board.commitPendingEntities(t);
-    board.cleanDeadEntities(t);
+    for (int k = 0; k < TICKS_PER_STEP; ++k) {
+        const int engineTick = stepsToTicks(t - 1) + k + 1;
+        board.currentTick = engineTick;
+        for (const auto& e : board.getEntities()) if (e->isAlive()) e->update(board);
+        board.commitPendingEntities(engineTick);
+        board.cleanDeadEntities(engineTick);
+    }
 }
 
 }  // namespace
@@ -81,9 +85,9 @@ TEST_CASE("the load resets when an attack starts and counts down every tick", "[
     auto knight = spawnReady(board, KNIGHT, 9.0f, 5.0f, 0);
     dummy(board, 100, 9.0f, 6.5f, 100000);
     REQUIRE(knight->clientCycleOn());
-    tick(board, 1);                                         // in reach: the attack starts 700 into its 1200 cycle
-    REQUIRE(knight->attackTimerMs == 700);
-    REQUIRE(knight->loadMissingMs == 700);                  // reloading from the start
+    tick(board, 1);                                         // in reach: the attack starts 700 into its 1200 cycle on the step's first tick
+    REQUIRE(knight->attackTimerMs == 700 + (TICKS_PER_STEP - 1) * TICK_MS);   // and runs the rest of the step
+    REQUIRE(knight->loadMissingMs == 700 - (TICKS_PER_STEP - 1) * TICK_MS);   // reloading from the start
     for (int t = 2; t <= 8; ++t) tick(board, t);
     REQUIRE(knight->loadMissingMs == 0);                    // loaded again 0.7 s after the start, mid-cycle
 }
@@ -165,7 +169,7 @@ TEST_CASE("a stun pauses the swing and resumes it; the preload model rewound it"
         auto knight = spawnReady(board, KNIGHT, 9.0f, 5.0f, 0);
         auto target = dummy(board, 100, 9.0f, 6.5f, 100000);
         for (int t = 1; t <= 30; ++t) {
-            if (t == 3) knight->applyFreeze(5, 0.0f);
+            if (t == 3) knight->applyFreeze(secs(0.5), 0.0f);
             tick(board, t);
             if (target->hp < 100000) return t;
         }
@@ -185,11 +189,11 @@ TEST_CASE("a stunned unit drops its target and re-acquires the nearest each tick
     auto nearer = dummy(board, 101, 9.0f, 6.0f, 100000);   // nearer, also in reach
     tick(board, 2);
     REQUIRE(knight->getCurrentTargetId() == far->id);       // locked while in reach: no rescan
-    knight->applyFreeze(3, 0.0f);
+    knight->applyFreeze(secs(0.3), 0.0f);
     tick(board, 3);
     REQUIRE(knight->getCurrentTargetId() == nearer->id);    // dropped and re-acquired the nearest
     REQUIRE(knight->attacking);                             // in reach: the swing is kept, paused
-    REQUIRE(knight->attackTimerMs == 800);
+    REQUIRE(knight->attackTimerMs == 700 + (2 * TICKS_PER_STEP - 1) * TICK_MS);   // where steps 1-2 left it
 }
 
 TEST_CASE("a pure slow keeps the target; Sparky's stun empties her load", "[client_cycle][stun]") {
@@ -199,10 +203,10 @@ TEST_CASE("a pure slow keeps the target; Sparky's stun empties her load", "[clie
         auto far = dummy(board, 100, 9.0f, 6.9f, 100000);
         tick(board, 1);
         auto nearer = dummy(board, 101, 9.0f, 6.0f, 100000);
-        knight->applyFreeze(5, 0.5f);                       // a slow, not a stun
+        knight->applyFreeze(secs(0.5), 0.5f);                       // a slow, not a stun
         tick(board, 2);
         REQUIRE(knight->getCurrentTargetId() == far->id);
-        REQUIRE(knight->attackTimerMs == 750);              // 100 ms x 0.5
+        REQUIRE(knight->attackTimerMs == 700 + (TICKS_PER_STEP - 1) * TICK_MS + 50);   // step 2: 100 ms x 0.5
         (void)nearer;
     }
     {
@@ -213,7 +217,7 @@ TEST_CASE("a pure slow keeps the target; Sparky's stun empties her load", "[clie
         for (int t = 1; t <= 20; ++t) tick(board, t);
         REQUIRE(sparky->attacking);
         REQUIRE(sparky->loadMissingMs < sparky->clientLoadMs);
-        sparky->applyFreeze(2, 0.0f);
+        sparky->applyFreeze(secs(0.2), 0.0f);
         tick(board, 21);
         REQUIRE_FALSE(sparky->attacking);                   // reset
         REQUIRE(sparky->loadMissingMs == sparky->clientLoadMs);  // and unloaded (LOAD_FIRST_HIT ..._WHEN_ZAPPED)
@@ -237,7 +241,7 @@ TEST_CASE("a started swing runs to its hit wherever the target goes; an unstarte
         REQUIRE(hit == 6);
     }
     // Moved 2.0 past reach (beyond LOGIC_CANCEL_HIT_FROM_LONG_DISTANCE_RANGE 1.5): the Knight stands until the swing
-    // would land (tick 6), the hit is cancelled, then it walks. Off: the preload model's rule drops the swing at once
+    // would land (tick 6, its first 50 ms), the hit is cancelled, then it walks (the rest of tick 6). Off: the preload model's rule drops the swing at once
     // (kept only within reach + 1.5) and it walks from tick 3.
     auto run = [](bool finishes) {
         SwitchTo<&Fidelity::startedSwingFinishes> sw(finishes);
@@ -252,7 +256,7 @@ TEST_CASE("a started swing runs to its hit wherever the target goes; an unstarte
         REQUIRE(target->hp == 100000);
         return moved;
     };
-    REQUIRE(run(true) == 7);
+    REQUIRE(run(true) == 6);   // 7 at the 100 ms tick: the walk began on the next whole tick
     REQUIRE(run(false) == 3);
     // Unstarted: right after a hit (tick 6) the swing is at a cycle boundary; the target leaves reach: no hit at the
     // next cycle, the Knight walks at once.
@@ -355,15 +359,15 @@ TEST_CASE("pending damage: only a projectile attacker skips, and only for damage
         spawn(board, shooter);
         spawn(board, doomed);
         spawn(board, other);
-        // the shot is 2.0 tiles from `doomed`: 0.5 tiles a tick lands in 400 ms, 0.25 in 800 ms
+        // the shot is 2.0 tiles from `doomed`: 5 tiles a second lands in 400 ms, 2.5 in 800 ms
         spawn(board, std::make_shared<Projectile>(10, 5.0f, 10.0f, 0, doomed, shotSpeed, 100));
         shooter->update(board);
         return shooter->lastTargetId;
     };
-    REQUIRE(pick(true, 0.5f, true) == 3);    // a projectile unit, the shot lands in 400 ms: skipped
-    REQUIRE(pick(true, 0.25f, true) == 2);   // lands in 800 ms: not skipped
-    REQUIRE(pick(false, 0.5f, true) == 2);   // a melee attacker never skips
-    REQUIRE(pick(false, 0.25f, false) == 3); // the 41fe8ad rule: everyone, whenever it lands
+    REQUIRE(pick(true, perTick(5.0f), true) == 3);    // a projectile unit, the shot lands in 400 ms: skipped
+    REQUIRE(pick(true, perTick(2.5f), true) == 2);    // lands in 800 ms: not skipped
+    REQUIRE(pick(false, perTick(5.0f), true) == 2);   // a melee attacker never skips
+    REQUIRE(pick(false, perTick(2.5f), false) == 3);  // the 41fe8ad rule: everyone, whenever it lands
 }
 
 // ---------------- 8. King first shot ----------------
@@ -373,16 +377,18 @@ TEST_CASE("the King's first shot comes 0.5 s after it acquires, then every 1.0 s
         SwitchTo<&Fidelity::kingFirstShotDelay> sw(delay);
         SwitchTo<&Fidelity::princessFirstShotDelay> sw2(princessDelay);
         Board board;
-        const int cooldown = (symbol == 'R') ? 10 : 8;
+        const int cooldown = (symbol == 'R') ? secs(1.0) : secs(0.8);
         auto tower = std::make_shared<Tower>(200, 9.0f, 10.0f, 4824, 1, 7.0f, 109, cooldown, symbol);
         tower->clientLoadMs = (symbol == 'R') ? CLIENT_KING_TOWER_LOAD_TIME_MS : CLIENT_PRINCESS_TOWER_LOAD_TIME_MS;
         spawn(board, tower);
         dummy(board, 100, 9.0f, 5.0f, 100000, 0);
         std::vector<int> out;
-        for (int t = 1; t <= 25; ++t) {
+        for (int t = 1; t <= 25; ++t) {   // 100 ms steps
             const size_t before = board.getEntities().size();
-            tower->update(board);
-            board.commitPendingEntities(t);
+            for (int k = 0; k < TICKS_PER_STEP; ++k) {
+                tower->update(board);
+                board.commitPendingEntities(t);
+            }
             if (board.getEntities().size() > before) out.push_back(t);
         }
         return out;
@@ -413,11 +419,12 @@ TEST_CASE("GameManager gives the crown towers their client load", "[client_cycle
 TEST_CASE("client elixir rate: 2.8 s an elixir at 1x (off by default: 2.857)", "[client_cycle][elixir]") {
     std::vector<int> deck = {0, 1, 2, 3, 4, 5, 6, 7};
     GameManager game(deck, deck);
-    REQUIRE(game.elixirRegenPerTick(0) == Catch::Approx(0.035f));
+    const float ticksPerSecond = 1000.0f / TICK_MS;
+    REQUIRE(game.elixirRegenPerTick(0) * TICKS_PER_STEP == Catch::Approx(0.035f));   // 0.035 per 100 ms
     SwitchTo<&Fidelity::clientElixirRate> sw(true);
-    REQUIRE(game.elixirRegenPerTick(0) * 28.0f == Catch::Approx(1.0f));
-    REQUIRE(game.elixirRegenPerTick(GameManager::DOUBLE_ELIXIR_TICK) * 14.0f == Catch::Approx(1.0f));
-    REQUIRE(game.elixirRegenPerTick(GameManager::TRIPLE_ELIXIR_TICK) * 9.3f == Catch::Approx(1.0f));
+    REQUIRE(game.elixirRegenPerTick(0) * ticksPerSecond * 2.8f == Catch::Approx(1.0f));
+    REQUIRE(game.elixirRegenPerTick(GameManager::DOUBLE_ELIXIR_TICK) * ticksPerSecond * 1.4f == Catch::Approx(1.0f));
+    REQUIRE(game.elixirRegenPerTick(GameManager::TRIPLE_ELIXIR_TICK) * ticksPerSecond * 0.93f == Catch::Approx(1.0f));
 }
 
 TEST_CASE("crown towers are seen 2 tiles further, edge to edge: Knight 5.5 + 0.5 + 1.0 + 2 = 9.0", "[client_cycle][targeting]") {

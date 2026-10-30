@@ -23,7 +23,7 @@ public:
           slowTicks(slowTicks), slowFactor(slowFactor), freezeTicks(freezeTicks) {}
 
     void apply(Board& board, CombatEntity& self) const override {
-        const int STAGE_GAP_TICKS = 5;
+        const int STAGE_GAP_TICKS = secs(0.5);
         for (int stage = 0; stage < 3; ++stage) {
             bool isFinalBlast = (stage == 2);
             auto onHit = isFinalBlast

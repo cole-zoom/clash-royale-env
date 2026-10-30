@@ -100,7 +100,8 @@ struct Match {
     }
     std::vector<int> hitTicksBy(int attackerId) const {
         std::vector<int> t;
-        for (const auto& d : rec->damage) if (d.attackerId == attackerId) t.push_back(d.tick);
+        // in 100 ms steps (the step a hit's engine tick falls in), as step() counts
+        for (const auto& d : rec->damage) if (d.attackerId == attackerId) t.push_back(ticksToStepsCeil(d.tick));
         return t;
     }
     std::shared_ptr<Entity> princessTower(int team, float x) {
@@ -319,7 +320,7 @@ SpiritLog spiritSpawns(Match& m, const std::shared_ptr<Entity>& furnace, int tic
         for (const auto& e : m.board().getEntities())
             if (e->name == "Fire Spirit" && e->team == 0 && !seen.count(e->id)) {
                 seen.insert(e->id);
-                log.ticks.push_back(m.game.getCurrentTick());
+                log.ticks.push_back(ticksToSteps(m.game.getCurrentTick()));   // 100 ms steps
                 log.dx.push_back(e->position.x - furnace->position.x);
             }
     }
@@ -332,7 +333,7 @@ TEST_CASE("Evolved Furnace spawns every 2.4 s only while attacking, to alternati
     SECTION("idle, it spawns at the base card's 7 s") {
         Match m;
         auto f = m.spawnCard(EVO_FURNACE, 8.5f, 6.0f, 0, true).front();
-        std::dynamic_pointer_cast<CombatEntity>(f)->applyFreeze(1000, 0.0f); // held, nothing in sight
+        std::dynamic_pointer_cast<CombatEntity>(f)->applyFreeze(secs(100.0), 0.0f); // held, nothing in sight
         auto log = spiritSpawns(m, f, 160);
         REQUIRE(log.ticks == std::vector<int>{ 80, 150 });
     }
@@ -425,7 +426,7 @@ TEST_CASE("Poison slows enemy troop movement 15%, not their attacks, and not bui
     Vector2D prev = knight->position;
     m.step();
     const float stepLen = std::hypot(knight->position.x - prev.x, knight->position.y - prev.y);
-    REQUIRE(stepLen == Catch::Approx(knight->getSpeed() * 0.85f).epsilon(0.02));
+    REQUIRE(stepLen == Catch::Approx(knight->getSpeed() * TICKS_PER_STEP * 0.85f).epsilon(0.02));   // one 100 ms step
     REQUIRE(knight->freezeTicks == 0); // movement-only: no freeze, so no slower cooldown
 
     auto hut = std::dynamic_pointer_cast<CombatEntity>(m.spawnCard(GOBLIN_HUT, 8.5f, 21.0f, 1).front());
@@ -441,7 +442,7 @@ TEST_CASE("Graveyard raises 12 Skeletons on seven fixed points, the first at 2.2
     Match m;
     const Vector2D cast{ 8.5f, 22.0f };
     m.spawnCard(GRAVEYARD, cast.x, cast.y, 0);
-    const int t0 = m.game.getCurrentTick();
+    const int t0 = ticksToSteps(m.game.getCurrentTick());   // 100 ms steps
     std::vector<int> ticks;
     std::vector<float> dist;
     std::set<int> seen;
@@ -450,7 +451,7 @@ TEST_CASE("Graveyard raises 12 Skeletons on seven fixed points, the first at 2.2
         for (const auto& e : m.board().getEntities())
             if (e->name == "Skeletons" && e->team == 0 && !seen.count(e->id)) {
                 seen.insert(e->id);
-                ticks.push_back(m.game.getCurrentTick() - t0);
+                ticks.push_back(ticksToSteps(m.game.getCurrentTick()) - t0);
                 dist.push_back(e->position.distanceTo(cast));
             }
     }
@@ -549,8 +550,8 @@ TEST_CASE("Goblin Hut is 1180 hp and its Spear Goblins shoot air, every 1.6 s",
     auto goblin = m.stepUntil("Spear Goblins", 0, 60);
     REQUIRE(goblin);
     REQUIRE(goblin->targetsAir);
-    REQUIRE(goblin->getAttackCooldown() == 16);
-    REQUIRE(goblin->deployTicksRemaining == 5); // 0.5 s, not the default 1 s (August 2025)
+    REQUIRE(goblin->getAttackCooldown() == secs(1.6));
+    REQUIRE(goblin->deployTicksRemaining == secs(0.5)); // 0.5 s, not the default 1 s (August 2025)
     m.step(100);
     REQUIRE(flyer->hp < 1000000); // was untouched: the Hut's goblins could not target air
 }

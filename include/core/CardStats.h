@@ -6,6 +6,7 @@
 #include "PeriodicEffect.h"
 #include "AbilityEffect.h"
 #include "PelletSpread.h"
+#include "Tick.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -23,12 +24,13 @@ enum class Archetype {
 };
 
 // Converts the registry's speed values (the engine's original units) into
-// real-game tiles/tick. Applied once, in CardRegistry's troop() and
+// real-game tiles per engine tick: 0.2 per 100 ms, so 0.1 at the 50 ms tick
+// (Tick.h). Applied once, in CardRegistry's troop() and
 // SpiritEmpressForms.h, at construction rather than in Troop::update, so
 // Troop::getSpeed() (the observation's CH_SPEED) reports the speed actually
 // moved at. Derived from real recordings (perception/UPSTREAM_REQUESTS.md item
 // 9).
-inline constexpr float MOVEMENT_SPEED_SCALE = 0.2f;
+inline constexpr float MOVEMENT_SPEED_SCALE = 0.2f * static_cast<float>(TICK_MS) / 100.0f;
 
 // Speed tiers. The real game publishes one speed per card, in tiles per minute,
 // taking only five values: 30 / 45 / 60 / 90 / 120 (Very Slow .. Very Fast). A
@@ -45,14 +47,14 @@ inline constexpr float SPEED_MEDIUM    = 60.0f  * REAL_TILES_PER_MIN_TO_ENGINE;
 inline constexpr float SPEED_FAST      = 90.0f  * REAL_TILES_PER_MIN_TO_ENGINE;
 inline constexpr float SPEED_VERY_FAST = 120.0f * REAL_TILES_PER_MIN_TO_ENGINE;
 
-// Ticks a freshly placed troop or building spends inert (targetable and
+// Engine ticks a freshly placed troop or building spends inert (targetable and
 // damageable, but unable to move, target or attack): 1.0 s, as in the real
 // game. Without it every defensive placement acts immediately, a systematic
 // subsidy to defence (perception/UPSTREAM_REQUESTS.md item 14).
 //
 // Applied in CardFactories::applyCardMetadata, which spells, deploy effects,
 // towers and projectiles bypass.
-inline constexpr int DEPLOY_TIME_TICKS = 10;
+inline constexpr int DEPLOY_TIME_TICKS = secs(1.0);
 
 struct CardStats {
     int id = 0;
@@ -269,7 +271,7 @@ struct CardStats {
     int initialCooldownTicks = 0;
     // A building's life before it expires (Building::lifetimeTicks). 30 s is the client's for most; the
     // others set their own LifeTime (Tesla 25 s, Goblin Cage 20 s, Elixir Collector 110 s, Goblin Drill 10 s).
-    int lifetimeTicks = 300;
+    int lifetimeTicks = secs(30.0);
     // HP-threshold transform (Cannon Cart).
     float transformAtHpFraction = 0.0f;
     int transformLifetimeTicks = 0;
@@ -322,7 +324,7 @@ struct CardStats {
     int abilityUsesLimit = -1;
     // The deck card whose Heroic/Wild slot owns this body's ability, when that
     // is not its own id: Hero Barbarian Barrel's Barbarian (-47) is spawned by
-    // the rolling spell (174) ~17 ticks after the play. 0 means its own id.
+    // the rolling spell (174) ~1.7 s after the play. 0 means its own id.
     // GameManager::trackSlotEntities matches on it.
     int abilitySlotCardId = 0;
     // Lockout before the FIRST use only (Hero Mega Minion: 1.5 s), distinct

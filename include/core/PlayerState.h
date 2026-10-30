@@ -49,7 +49,7 @@ public:
     float elixir;
     std::vector<int> hand;
     // Parallel to hand. > 0 means the card just cycled in and is not yet
-    // playable (20 ticks); 0 for the opening hand.
+    // playable (2.0 s, in engine ticks); 0 for the opening hand.
     std::vector<int> handCooldownTicks;
     std::deque<int> deckQueue;
     std::unordered_map<int, EvolutionSlotState> evolutionState;
@@ -160,7 +160,7 @@ public:
         deckQueue.pop_front();
         deckQueue.push_back(cardId);
         hand[handIndex] = nextCard;
-        handCooldownTicks[handIndex] = 20;
+        handCooldownTicks[handIndex] = secs(2.0);
 
         bool useEvolvedForm = false;
         if (cardDef->isEvolution) {

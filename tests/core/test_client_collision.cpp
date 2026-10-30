@@ -6,7 +6,7 @@
 
 // Unit collision as the client's code runs it (Fidelity::clientCollision; bot-77 docs/client-code-notes.md §5,
 // separation 0x71fff6058c): each body pushes only itself, in entity order, overlap x neighbour Mass / own Mass,
-// averaged and capped at 0.15 a 50 ms pass, two passes a tick; the river lets a push in one cell deep; JumpEnabled
+// averaged and capped at 0.15 a 50 ms pass, one pass an engine tick (two a 100 ms game.step()); the river lets a push in one cell deep; JumpEnabled
 // troops jump river cells at JumpSpeed without colliding.
 
 namespace {
@@ -77,7 +77,8 @@ TEST_CASE("client collision: an equal-mass pair separates by at most the cap a p
     REQUIRE(b->position.x - a->position.x == Catch::Approx(0.05f + 2 * Board::CLIENT_MAX_PUSH));
     REQUIRE(a->position.y == Catch::Approx(8.0f));   // no sideways nudge
 
-    // Through GameManager: one tick is two passes, so a pair standing on each other gains at most 4 x 0.15. Enemies,
+    // Through GameManager: one 100 ms step is two ticks, each a pass for each body, so a pair standing on each other
+    // gains at most 4 x 0.15. Enemies,
     // so they stand and fight rather than walk apart.
     GameManager game(DECK, DECK);
     Board& gb = game.getBoard();
@@ -167,7 +168,8 @@ TEST_CASE("client collision: a Hog jumps river cells at JumpSpeed and collides w
         game.step();
         if (startsOver && board.isRiverCellAt(hog->position.x, hog->position.y)) {
             ++jumped;
-            REQUIRE(hog->position.distanceTo(before) == Catch::Approx(hog->jumpSpeed).epsilon(0.01));
+            // game.step() is 100 ms: TICKS_PER_STEP ticks of the jump
+            REQUIRE(hog->position.distanceTo(before) == Catch::Approx(hog->jumpSpeed * TICKS_PER_STEP).epsilon(0.01));
             REQUIRE_FALSE(hog->collidesAsBody(board));
         }
     }

@@ -57,16 +57,16 @@ TEST_CASE("Building::performAttack deals direct damage with no projectile", "[bu
 TEST_CASE("Building decays over its lifetime and does not attack-decay before the interval", "[building][decay]") {
     Board board; // no enemies: isolates decay from combat
 
-    // hp=3000, lifetime=300 => decays maxHp/(300/10) = 100 every 10 ticks.
-    Building building(1, 5.0f, 5.0f, 3000, 0, 'C', 5.0f, 100, 10, 300);
+    // hp=3000, lifetime 30 s => decays maxHp/30 = 100 every second.
+    Building building(1, 5.0f, 5.0f, 3000, 0, 'C', 5.0f, 100, 10, secs(30.0));
 
-    for (int i = 0; i < 9; ++i) building.update(board);
+    for (int i = 0; i < secs(1.0) - 1; ++i) building.update(board);
     REQUIRE(building.hp == 3000); // no decay yet, interval not reached
 
-    building.update(board); // 10th tick: first decay
+    building.update(board); // 1.0 s: first decay
     REQUIRE(building.hp == 2900);
 
-    for (int i = 0; i < 10; ++i) building.update(board); // 20th tick: second decay
+    for (int i = 0; i < secs(1.0); ++i) building.update(board); // 2.0 s: second decay
     REQUIRE(building.hp == 2800);
 }
 

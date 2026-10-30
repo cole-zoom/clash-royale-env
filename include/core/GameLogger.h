@@ -211,13 +211,13 @@ public:
         }
         file << "},\n";
 
-        // The elixir phase schedule in ticks, emitted for the same reason as
+        // The elixir phase schedule in replay ticks (API steps, 100 ms), emitted for the same reason as
         // cardMeta: the viewer's only input is this JSON, so anything it is not
         // told it must hardcode. An old replay lacks the block, and the viewer
         // then assumes no phases.
         file << "  \"elixirPhases\": {"
-             << "\"doubleTick\":" << GameManager::DOUBLE_ELIXIR_TICK
-             << ",\"tripleTick\":" << GameManager::TRIPLE_ELIXIR_TICK
+             << "\"doubleTick\":" << GameManager::DOUBLE_ELIXIR_STEP
+             << ",\"tripleTick\":" << GameManager::TRIPLE_ELIXIR_STEP
              << "},\n";
 
         file << "  \"ticks\": [\n";

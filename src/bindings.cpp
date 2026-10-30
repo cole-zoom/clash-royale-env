@@ -30,7 +30,8 @@ PYBIND11_MODULE(clash_royale_env, m) {
     // observation encoder, which must write the same scalar the training
     // encoder does, and the replay viewer.
     m.attr("MAX_ELIXIR_MULTIPLIER") = GameManager::MAX_ELIXIR_MULTIPLIER;
-    m.def("elixir_multiplier_at_tick", &GameManager::elixirMultiplierAtTick,
+    // `tick` in API steps (100 ms, Tick.h), as every tick the bindings take.
+    m.def("elixir_multiplier_at_tick", &GameManager::elixirMultiplierAtStep,
           py::arg("tick"),
           "Elixir regeneration multiplier (1.0 / 2.0 / 3.0) in force at `tick`. "
           "10 ticks = 1 second: double from 2:00, triple from 3:00.");
@@ -155,11 +156,11 @@ PYBIND11_MODULE(clash_royale_env, m) {
              py::arg("team"), py::arg("slot"))
         .def("get_tower_max_hp", &ClashEnv::getTowerMaxHp,
              py::arg("team"), py::arg("slot"))
-        // Clamped to [0, max_ticks]; sets both engine clocks.
+        // In API steps (100 ms) like max_ticks; clamped to [0, max_ticks]; sets both engine clocks.
         .def("set_current_tick", &ClashEnv::setCurrentTick, py::arg("tick"))
         .def("get_current_tick", &ClashEnv::getCurrentTick)
         // Re-level a tower (slot 0 King, 1 left, 2 right): max hp, damage per
-        // shot, cooldown in ticks. Keeps the hp fraction. Defaults unchanged.
+        // shot, cooldown in API steps (100 ms). Keeps the hp fraction. Defaults unchanged.
         .def("set_tower_stats", &ClashEnv::setTowerStats, py::arg("team"), py::arg("slot"),
              py::arg("max_hp"), py::arg("damage"), py::arg("cooldown_ticks"))
         // Every live entity (towers, troops, buildings, spells in flight), for
@@ -228,27 +229,32 @@ PYBIND11_MODULE(clash_royale_env, m) {
         .def_readonly_static("CYCLE_START", &ClashEnv::CYCLE_START)
         .def_readonly_static("NUM_EXTRA_SCALARS", &ClashEnv::NUM_EXTRA_SCALARS)
         .def_readonly_static("MAX_MATCH_ELIXIR", &ClashEnv::MAX_MATCH_ELIXIR)
-        // Elixir phase boundaries in ticks, from GameManager.
-        .def_readonly_static("DOUBLE_ELIXIR_TICK", &GameManager::DOUBLE_ELIXIR_TICK)
-        .def_readonly_static("TRIPLE_ELIXIR_TICK", &GameManager::TRIPLE_ELIXIR_TICK);
+        // Elixir phase boundaries in API steps (100 ms), from GameManager.
+        .def_readonly_static("DOUBLE_ELIXIR_TICK", &GameManager::DOUBLE_ELIXIR_STEP)
+        .def_readonly_static("TRIPLE_ELIXIR_TICK", &GameManager::TRIPLE_ELIXIR_STEP);
 
-    // A registered card's stats (read-only), for checking them against published data. Ticks and engine tiles.
+    // A registered card's stats (read-only), for checking them against published data. Ticks are API steps
+    // (100 ms; an int when whole, else a float), speed is engine tiles per step; engine tiles.
     m.def("get_card_stats", [](int cardId) {
         const CardStats* s = CardRegistry::getInstance().getStats(cardId);
         if (!s) throw std::invalid_argument("get_card_stats: unknown card id " + std::to_string(cardId));
+        auto steps = [](int ticks) -> py::object {
+            if (ticks % TICKS_PER_STEP == 0) return py::int_(ticks / TICKS_PER_STEP);
+            return py::float_(static_cast<double>(ticks) / TICKS_PER_STEP);
+        };
         py::dict d;
         d["id"] = s->id; d["name"] = s->name; d["cost"] = s->cost;
-        d["hp"] = s->hp; d["damage"] = s->damage; d["attack_cooldown"] = s->attackCooldown;
-        d["attack_range"] = s->attackRange; d["speed"] = s->speed; d["sight_range"] = s->sightRange;
-        d["flying"] = s->isFlying; d["targets_air"] = s->targetsAir; d["deploy_ticks"] = s->deployTicks;
+        d["hp"] = s->hp; d["damage"] = s->damage; d["attack_cooldown"] = steps(s->attackCooldown);
+        d["attack_range"] = s->attackRange; d["speed"] = s->speed * TICKS_PER_STEP; d["sight_range"] = s->sightRange;
+        d["flying"] = s->isFlying; d["targets_air"] = s->targetsAir; d["deploy_ticks"] = steps(s->deployTicks);
         d["bodies"] = static_cast<int>(s->spawnOffsets.size()); d["splash_radius"] = s->splashRadius;
         d["spell_radius"] = s->spellRadius; d["spell_crown_tower_damage"] = s->spellCrownTowerDamage;
         d["spell_hits"] = s->spellRemainingHits;
         // withDeployDelay: the first attack waits this long (it ticks during deploy), so a
         // building acts at max(deploy_ticks, deploy_delay_ticks) (X-Bow / Mortar 3.5 s)
-        d["deploy_delay_ticks"] = s->initialCooldownTicks;
+        d["deploy_delay_ticks"] = steps(s->initialCooldownTicks);
         d["die_after_first_hit"] = s->dieAfterFirstHit; // the client's Kamikaze
-        d["lifetime_ticks"] = s->lifetimeTicks;          // buildings only
+        d["lifetime_ticks"] = steps(s->lifetimeTicks);   // buildings only
         py::list offs;
         for (const auto& o : s->spawnOffsets) offs.append(py::make_tuple(o.x, o.y));
         d["spawn_offsets"] = offs;

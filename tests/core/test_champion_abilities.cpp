@@ -26,7 +26,7 @@ TEST_CASE("Golden Knight (116) is registered with the right stats and ability", 
     REQUIRE(knight->hp == 1799);
     REQUIRE(knight->isChampion);
     REQUIRE(knight->abilityElixirCost == Catch::Approx(1.0f));
-    REQUIRE(knight->abilityCooldownTicks == 120);
+    REQUIRE(knight->abilityCooldownTicks == secs(12.0));
 }
 
 TEST_CASE("Skeleton King (117) is registered with soul collection and the right ability", "[card_registry][champion]") {
@@ -55,7 +55,7 @@ TEST_CASE("Archer Queen (118) is registered as air+ground with the right ability
     REQUIRE(queen != nullptr);
     REQUIRE(queen->hp == 1000);
     REQUIRE(queen->targetsAir);
-    REQUIRE(queen->abilityCooldownTicks == 170);
+    REQUIRE(queen->abilityCooldownTicks == secs(17.0));
 }
 
 TEST_CASE("Monk (119) is registered with the right stats and ability", "[card_registry][champion]") {
@@ -81,8 +81,8 @@ TEST_CASE("Little Prince (120) is registered with a hit-speed ramp and the Guard
     auto prince = std::dynamic_pointer_cast<CombatEntity>(board.getEntities()[0]);
     REQUIRE(prince != nullptr);
     REQUIRE(prince->hp == 698);
-    REQUIRE(prince->hitSpeedRampFullTick == 60);
-    REQUIRE(prince->abilityCooldownTicks == 300);
+    REQUIRE(prince->hitSpeedRampFullTick == secs(6.0));
+    REQUIRE(prince->abilityCooldownTicks == secs(30.0));
 }
 
 TEST_CASE("Goblinstein (121) spawns both the Monster (champion) and the Doctor", "[card_registry][champion]") {

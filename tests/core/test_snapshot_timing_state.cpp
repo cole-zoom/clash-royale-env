@@ -47,9 +47,9 @@ std::vector<int> hpTrace(Board& board, int fromTick, int ticks) {
 
 TEST_CASE("a copied Building keeps its position in the decay schedule, not just its hp",
           "[deepcopy][timing]") {
-    // Buildings decay when ticksAlive % 10 == 0. Copied on a multiple of 10, a
-    // copy with ticksAlive reset to 0 would decay on the same ticks, so the
-    // copy is taken at step 7.
+    // Buildings decay when ticksAlive is a whole second (secs(1.0)). Copied on a
+    // multiple of that, a copy with ticksAlive reset to 0 would decay on the
+    // same ticks, so the copy is taken at tick 7.
     Board original;
     auto cannon = std::make_shared<Building>(1, 9.0f, 8.0f, 824, 0, 'C',
                                              5.5f, 202, 10);   // lifetime 300, the default
@@ -59,10 +59,10 @@ TEST_CASE("a copied Building keeps its position in the decay schedule, not just 
 
     Board copy = original.deepCopy();
 
-    // 40 ticks: four decay events, enough to show a one-off or a persistent
+    // 4 s: four decay events, enough to show a one-off or a persistent
     // phase error.
-    std::vector<int> a = hpTrace(original, 7, 40);
-    std::vector<int> b = hpTrace(copy, 7, 40);
+    std::vector<int> a = hpTrace(original, 7, secs(4.0));
+    std::vector<int> b = hpTrace(copy, 7, secs(4.0));
 
     REQUIRE(a == b);
 

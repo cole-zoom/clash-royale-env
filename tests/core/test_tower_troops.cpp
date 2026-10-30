@@ -13,7 +13,7 @@ TEST_CASE("towerTroopStats(None) exactly reproduces this engine's original hardc
     REQUIRE(stats.hp == 2534);
     REQUIRE(stats.attackRange == Catch::Approx(7.5f));
     REQUIRE(stats.damage == 90);
-    REQUIRE(stats.attackCooldown == 8);
+    REQUIRE(stats.attackCooldown == secs(0.8));
 }
 
 TEST_CASE("towerTroopStats(TowerPrincess) gives the sourced, stronger stats", "[tower_troops]") {
@@ -26,7 +26,7 @@ TEST_CASE("towerTroopStats(Cannoneer) gives the sourced stats with no splash", "
     CardStats stats = towerTroopStats(TowerTroopType::Cannoneer);
     REQUIRE(stats.hp == 3052);
     REQUIRE(stats.damage == 109);
-    REQUIRE(stats.attackCooldown == 8);
+    REQUIRE(stats.attackCooldown == secs(0.8));
     REQUIRE(stats.splashRadius == Catch::Approx(0.0f));
 }
 
@@ -40,7 +40,7 @@ TEST_CASE("towerTroopStats(DaggerDuchess) carries the burst-attack fields", "[to
 TEST_CASE("towerTroopStats(RoyalChef) carries a periodic buff effect", "[tower_troops]") {
     CardStats stats = towerTroopStats(TowerTroopType::RoyalChef);
     REQUIRE(stats.periodicEffect != nullptr);
-    REQUIRE(stats.periodicIntervalTicks == 280);
+    REQUIRE(stats.periodicIntervalTicks == secs(28.0));
 }
 
 TEST_CASE("GameManager defaults to TowerTroopType::None -- existing behavior byte-for-byte unaffected",

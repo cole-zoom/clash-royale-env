@@ -269,7 +269,8 @@ TEST_CASE("Executioner's axe hits its target twice: on arrival, then again on th
     auto axe = std::dynamic_pointer_cast<Projectile>(board.getEntities().back());
     REQUIRE(axe != nullptr);
 
-    axe->update(board); // projectile speed >= distance 1.0: outbound hit lands this tick
+    // the client axe flies 1.215 tiles per 100 ms: the outbound hit lands within one 100 ms step
+    for (int i = 0; i < TICKS_PER_STEP; ++i) axe->update(board);
     REQUIRE(enemy->hp == 821); // 1000 - 179
     REQUIRE(axe->isAlive()); // still out on its return trip, not dead after one hit
 
@@ -403,9 +404,9 @@ TEST_CASE("Giant Skeleton, Ice Golem and Balloon deal death-explosion damage", "
             if (e->name == "Giant Skeleton Bomb") bomb = e;
         REQUIRE(bomb != nullptr);
         REQUIRE_FALSE(bomb->isTargetable()); // the real bomb cannot be destroyed
-        for (int i = 0; i < 29; ++i) bomb->update(board);
+        for (int i = 0; i < secs(3.0) - 1; ++i) bomb->update(board);
         REQUIRE(enemy->hp == 100000);
-        bomb->update(board); // its 30th tick: 3.0 s after the death
+        bomb->update(board); // its last tick: 3.0 s after the death
         REQUIRE(enemy->hp == 100000 - 886);
     }
 
@@ -509,9 +510,9 @@ TEST_CASE("Inferno Tower's damage ramps up the longer it stays locked onto the s
     tower->update(board); // ticksOnTarget == 0 on first lock: stage 1
     REQUIRE(enemy->hp == 1000000 - 44); // client infernotower.toml Damage 17 -> 44 (2026-10-28; was 5% = 42)
 
-    for (int i = 0; i < 39; ++i) tower->update(board); // advance to just before ticksOnTarget == 40
+    for (int i = 0; i < secs(4.0) - 1; ++i) tower->update(board); // advance to just before ticksOnTarget == 4.0 s
     int hpBefore = enemy->hp;
-    tower->update(board); // ticksOnTarget == 40 on an attack tick (cooldown 4 divides it): full damage
+    tower->update(board); // ticksOnTarget == 4.0 s on an attack tick (cooldown 0.4 s divides it): full damage
     REQUIRE(hpBefore - enemy->hp == 847);
 }
 
@@ -703,9 +704,9 @@ TEST_CASE("Ice Wizard is genuinely ranged: freeze lands with the arrow, not when
     auto projectile = std::dynamic_pointer_cast<Projectile>(board.getEntities().back());
     REQUIRE(projectile != nullptr);
 
-    projectile->update(board); // projectile speed 1.5 >= distance 1.0: lands this tick
+    for (int i = 0; i < TICKS_PER_STEP; ++i) projectile->update(board); // 1.547 tiles per 100 ms >= distance 1.0: lands within one step
     // client IceWizardSlowDown: -30% for 2.5 s (2026-10-28; was 3.0 s at 0.65)
-    REQUIRE(enemy->freezeTicks == 25);
+    REQUIRE(enemy->freezeTicks == secs(2.5));
     REQUIRE(enemy->freezeSlow == Catch::Approx(0.7f));
 }
 
@@ -737,7 +738,7 @@ TEST_CASE("Ice Golem's slow is on its death explosion, never on its attack",
     // ...and dying does slow: same duration and strength, the right trigger.
     golem->hp = 0;
     board.cleanDeadEntities();
-    REQUIRE(enemy->freezeTicks == 30);
+    REQUIRE(enemy->freezeTicks == secs(3.0));
     REQUIRE(enemy->freezeSlow == Catch::Approx(0.65f));
 }
 
@@ -766,7 +767,7 @@ TEST_CASE("Electro Wizard stuns on hit via the on-hit decorator (freeze with slo
     electroWizardEntity->update(board);
 
     REQUIRE(enemy->hp == 882); // 1000 - 118
-    REQUIRE(enemy->freezeTicks == 5);
+    REQUIRE(enemy->freezeTicks == secs(0.5));
     REQUIRE(enemy->freezeSlow == Catch::Approx(0.0f));
 }
 
@@ -794,8 +795,8 @@ TEST_CASE("Electro Wizard splits its attack across the 2 closest enemies at half
 
     REQUIRE(near->hp == 941);  // 1000 - 118/2
     REQUIRE(far->hp == 941);
-    REQUIRE(near->freezeTicks == 5); // both stunned
-    REQUIRE(far->freezeTicks == 5);
+    REQUIRE(near->freezeTicks == secs(0.5)); // both stunned
+    REQUIRE(far->freezeTicks == secs(0.5));
 }
 
 TEST_CASE("Electro Wizard's deploy zap damages and stuns enemies in radius the instant it's played", "[card_registry][on_hit][spawn_effect]") {
@@ -817,7 +818,7 @@ TEST_CASE("Electro Wizard's deploy zap damages and stuns enemies in radius the i
     deployZap->update(board); // zero delay: detonates immediately
 
     REQUIRE(enemy->hp == 882); // 1000 - 118
-    REQUIRE(enemy->freezeTicks == 5);
+    REQUIRE(enemy->freezeTicks == secs(0.5));
     REQUIRE(enemy->freezeSlow == Catch::Approx(0.0f));
 }
 
@@ -851,7 +852,7 @@ TEST_CASE("Freeze deals its landing damage and fully stuns everyone in radius vi
 
     // client freeze.toml (2026-10-28): BaseDamage 58 -> 148 at level 11, BuffTime 3.5 s (was no damage, 4 s)
     REQUIRE(enemy->hp == 1000 - 148);
-    REQUIRE(enemy->freezeTicks == 35); // 3.5 s full stun
+    REQUIRE(enemy->freezeTicks == secs(3.5)); // 3.5 s full stun
     REQUIRE(enemy->freezeSlow == Catch::Approx(0.0f));
 }
 
@@ -869,7 +870,7 @@ TEST_CASE("Giant Snowball deals damage and applies a partial slow via spellOnHit
 
     REQUIRE(enemy->hp == 821); // 1000 - 179
     // client SnowballSpell: IceWizardSlowDown (-30%) for BuffTime 3.0 s (2026-10-28; was 1.5 s at 0.5)
-    REQUIRE(enemy->freezeTicks == 30);
+    REQUIRE(enemy->freezeTicks == secs(3.0));
     REQUIRE(enemy->freezeSlow == Catch::Approx(0.7f));
 }
 
@@ -1011,8 +1012,8 @@ TEST_CASE("Bomb Tower splashes, and drops a 3-second bomb when destroyed", "[car
             if (e->name == "Bomb Tower Bomb") bomb = e;
         REQUIRE(bomb != nullptr);
         int ticks = 0;
-        while (bomb->isAlive() && near->hp == 100000 && ticks < 100) { bomb->update(board); ++ticks; }
-        REQUIRE(ticks == 30);   // fuse 29: detonates 30 ticks after the death (3.0 s)
+        while (bomb->isAlive() && near->hp == 100000 && ticks < secs(10.0)) { bomb->update(board); ++ticks; }
+        REQUIRE(ticks == secs(3.0));   // fuse secs(3.0) - 1: detonates 3.0 s after the death
         REQUIRE(near->hp == 100000 - 222);
         REQUIRE(far->hp == 100000);
         REQUIRE(flier->hp == 100000);   // the bomb lands on the ground
@@ -1115,7 +1116,7 @@ TEST_CASE("Tombstone periodically spawns Skeletons while alive, not just on deat
     REQUIRE(board.getEntities().size() == 1); // just the Tombstone itself so far
 
     advancePastDeploy(building, board);
-    for (int i = 0; i < 35; ++i) building->update(board); // its periodic interval
+    for (int i = 0; i < secs(3.5); ++i) building->update(board); // its periodic interval
     board.commitPendingEntities(); // the spawned Skeletons become visible
 
     int skeletonCount = 0;
@@ -1139,7 +1140,7 @@ TEST_CASE("Rage buffs an ally's damage in radius instead of damaging enemies", "
 
     while (spell->isAlive()) spell->update(board);
 
-    REQUIRE(ally->buffTicksRemaining == 45);
+    REQUIRE(ally->buffTicksRemaining == secs(4.5));
     REQUIRE(ally->hp == 1000);   // buffed, not damaged
     REQUIRE(enemy->hp == 1000);  // Rage never touches enemies at all
 }
@@ -1226,7 +1227,7 @@ TEST_CASE("Graveyard spawns faster than a Princess Tower can kill", "[card_regis
 
     std::vector<int> arrivals;
     int last = living();
-    for (int tick = 0; tick < 200 && spell->isAlive(); ++tick) {
+    for (int tick = 0; tick < secs(20.0) && spell->isAlive(); ++tick) {
         spell->update(board);
         board.commitPendingEntities();
         if (living() > last) { arrivals.push_back(tick); last = living(); }
@@ -1238,7 +1239,7 @@ TEST_CASE("Graveyard spawns faster than a Princess Tower can kill", "[card_regis
         widestGap = std::max(widestGap, arrivals[i] - arrivals[i - 1]);
 
     // The yardstick is read from a real Princess Tower.
-    Tower princess(999, 3.0f, 6.0f, 2534, 1, 7.0f, 50, 10, 'P');
+    Tower princess(999, 3.0f, 6.0f, 2534, 1, 7.0f, 50, secs(1.0), 'P');
     REQUIRE(widestGap < princess.getAttackCooldown());
 }
 
@@ -1305,12 +1306,12 @@ TEST_CASE("Mighty Miner (115) is a Champion with the correct stats, ramp, and ab
     REQUIRE(miner != nullptr);
     REQUIRE(miner->hp == 2250);
     REQUIRE(miner->isChampion);
-    // Liquipedia: 2 s per stage since the 2025-01-08 patch, so 20 ticks to
-    // stage 2 and 40 to max.
-    REQUIRE(miner->rampMidTick == 20);
-    REQUIRE(miner->rampFullTick == 40);
+    // Liquipedia: 2 s per stage since the 2025-01-08 patch, so 2.0 s to
+    // stage 2 and 4.0 s to max.
+    REQUIRE(miner->rampMidTick == secs(2.0));
+    REQUIRE(miner->rampFullTick == secs(4.0));
     REQUIRE(miner->abilityElixirCost == Catch::Approx(1.0f));
-    REQUIRE(miner->abilityCooldownTicks == 130);
+    REQUIRE(miner->abilityCooldownTicks == secs(13.0));
     REQUIRE(miner->abilityEffect != nullptr);
     REQUIRE(miner->abilityCooldownRemaining == 0); // ready immediately at deploy
 }
@@ -1446,7 +1447,7 @@ TEST_CASE("Mother Witch's curse arms a Cursed Hog that spawns for HER team when 
 
     // Mother Witch is ranged: her curse lands when the projectile arrives.
     // Drive the GameManager::step() update/commit loop until it does.
-    for (int i = 0; i < 20 && enemy->curseTicksRemaining == 0; ++i) {
+    for (int i = 0; i < secs(2.0) && enemy->curseTicksRemaining == 0; ++i) {
         for (const auto& e : board.getEntities()) {
             if (e->isAlive()) e->update(board);
         }
@@ -1491,14 +1492,14 @@ TEST_CASE("Goblin Hut only summons while an enemy is within its detection range"
     board.commitPendingEntities();
     auto hut = board.getEntities()[0];
 
-    for (int i = 0; i < 22; ++i) hut->update(board); // one full interval, no enemy anywhere
+    for (int i = 0; i < secs(2.2); ++i) hut->update(board); // one full interval, no enemy anywhere
     board.commitPendingEntities();
     int countNoEnemy = static_cast<int>(board.getEntities().size());
     REQUIRE(countNoEnemy == 1); // just the Hut itself -- no spawn
 
     auto enemy = std::make_shared<DummyEntity>(50, 6.0f, 5.0f, 100, 1); // dist 1.0, inside 6.0 range
     spawn(board, enemy);
-    for (int i = 0; i < 22; ++i) hut->update(board);
+    for (int i = 0; i < secs(2.2); ++i) hut->update(board);
     board.commitPendingEntities();
 
     REQUIRE(static_cast<int>(board.getEntities().size()) > countNoEnemy + 1); // Hut + enemy + at least one Spear Goblin
@@ -1572,7 +1573,7 @@ TEST_CASE("Bowler's piercing line hits a bystander behind the primary target, no
     advancePastDeploy(bowler, board);
     bowler->update(board); // fires the projectile
     board.commitPendingEntities();
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < secs(1.0); ++i) {
         for (const auto& e : board.getEntities()) {
             if (e->isAlive()) e->update(board);
         }
@@ -1594,15 +1595,15 @@ TEST_CASE("X-Bow can't fire until its slow initial deploy delay elapses", "[card
     board.commitPendingEntities();
     auto xbow = board.getEntities().back();
 
-    for (int i = 0; i < 34; ++i) xbow->update(board); // 3.4s: still not ready (delay is 3.5s/35 ticks)
+    for (int i = 0; i < secs(3.5) - 1; ++i) xbow->update(board); // one tick short of its 3.5 s delay: not ready
     REQUIRE(enemy->hp == 100000);
 
-    xbow->update(board); // the 35th tick: ready to fire
-    // then the preload model's first hit: client X-Bow HitSpeed 300 - LoadTime 0 = 3 ticks (2026-10-29)
+    xbow->update(board); // the delay's last tick: ready to fire
+    // then the preload model's first hit: client X-Bow HitSpeed 400 - LoadTime 0 = 0.4 s (2026-10-29)
     int extra = 0;
-    while (enemy->hp == 100000 && extra < 10) { xbow->update(board); ++extra; }
+    while (enemy->hp == 100000 && extra < secs(1.0)) { xbow->update(board); ++extra; }
     REQUIRE(enemy->hp < 100000);
-    REQUIRE(extra == 4);  // acts from the 36th tick (its 3.5 s deploy), lands 3 ticks later
+    REQUIRE(extra == secs(0.4));  // starts on the delay's last tick, lands 0.4 s later (3.9 s in all)
 }
 
 

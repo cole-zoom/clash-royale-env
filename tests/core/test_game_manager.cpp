@@ -364,7 +364,8 @@ TEST_CASE("step()'s post-collision re-clamp respects riverIgnores (regression te
 
     // Mid-river at a non-bridge column, like a Hog mid-crossing. Both clamps go
     // through Board::clampToBoard(), so neither snaps it back.
-    auto hog = std::make_shared<BuildingTargeter>(board.allocateId(), 8.0f, 16.5f, 1408, 0, 0.8f, 1.0f, 264, 15, 'H');
+    // 0.8 tiles per 100 ms step (one game.step()), so it is still mid-river after it
+    auto hog = std::make_shared<BuildingTargeter>(board.allocateId(), 8.0f, 16.5f, 1408, 0, perTick(8.0f), 1.0f, 264, 15, 'H');
     hog->setIgnoresRiver(true);
     board.addEntity(hog);
     board.commitPendingEntities();
@@ -499,19 +500,19 @@ TEST_CASE("A freshly-cycled-in hand slot is unplayable for 19 ticks, playable on
     auto opening = player.playCard(0);
     REQUIRE(opening.cardId == 0);
 
-    // hand[0] is now 4, cycled in from the queue with a fresh 20-tick cooldown:
-    // unplayable for 19 ticks...
+    // hand[0] is now 4, cycled in from the queue with a fresh 2.0 s cooldown:
+    // unplayable for all but its last tick...
     REQUIRE(player.hand[0] == 4);
-    for (int i = 0; i < 19; ++i) {
+    for (int i = 0; i < secs(2.0) - 1; ++i) {
         auto blocked = player.playCard(0);
         REQUIRE(blocked.cardId == -1); // still cooling down
         REQUIRE(player.hand[0] == 4);  // nothing consumed, hand slot untouched
         player.tick();
     }
-    auto stillBlocked = player.playCard(0); // 19 ticks elapsed -- one more needed
+    auto stillBlocked = player.playCard(0); // one tick short -- one more needed
     REQUIRE(stillBlocked.cardId == -1);
 
-    // ...and playable once the 20th tick lands.
+    // ...and playable once the last tick lands.
     player.tick();
     auto afterCooldown = player.playCard(0);
     REQUIRE(afterCooldown.cardId == 4);
@@ -825,9 +826,13 @@ TEST_CASE("elixir regen follows the real-game 1x/2x/3x phase schedule",
     REQUIRE(GameManager::elixirMultiplierAtTick(GameManager::TRIPLE_ELIXIR_TICK - 1) == 2.0f);
     REQUIRE(GameManager::elixirMultiplierAtTick(GameManager::TRIPLE_ELIXIR_TICK) == 3.0f);
 
-    // The boundaries against the 10-ticks-per-second conversion.
-    REQUIRE(GameManager::DOUBLE_ELIXIR_TICK == 120 * 10);   // 2:00
-    REQUIRE(GameManager::TRIPLE_ELIXIR_TICK == 240 * 10);   // 4:00
+    // The boundaries, in engine ticks and in the API's 100 ms steps (10 a second).
+    REQUIRE(GameManager::DOUBLE_ELIXIR_TICK == secs(120.0));   // 2:00
+    REQUIRE(GameManager::TRIPLE_ELIXIR_TICK == secs(240.0));   // 4:00
+    REQUIRE(GameManager::DOUBLE_ELIXIR_STEP == 120 * 10);
+    REQUIRE(GameManager::TRIPLE_ELIXIR_STEP == 240 * 10);
+    REQUIRE(GameManager::elixirMultiplierAtStep(GameManager::DOUBLE_ELIXIR_STEP - 1) == 1.0f);
+    REQUIRE(GameManager::elixirMultiplierAtStep(GameManager::DOUBLE_ELIXIR_STEP) == 2.0f);
     // Overtime begins at 3:00 still at double: the first minute of overtime.
     REQUIRE(GameManager::elixirMultiplierAtTick(MatchRules::REGULATION_END_TICK) == 2.0f);
     REQUIRE(GameManager::MAX_ELIXIR_MULTIPLIER
@@ -849,18 +854,19 @@ TEST_CASE("elixir income is actually multiplied, measured off the bar",
         return game.playerAI.elixir - before;
     };
 
-    // 20 ticks: the bar clamps at 10.0, so a long window would saturate and
+    // 20 steps (2 s): the bar clamps at 10.0, so a long window would saturate and
     // every phase would read the same.
     REQUIRE(incomeOver(0, 20) == Catch::Approx(0.7f).margin(0.01f));
     REQUIRE(incomeOver(GameManager::DOUBLE_ELIXIR_TICK, 20) == Catch::Approx(1.4f).margin(0.01f));
     REQUIRE(incomeOver(GameManager::TRIPLE_ELIXIR_TICK, 20) == Catch::Approx(2.1f).margin(0.01f));
 
-    // Crossing a boundary mid-window. step() increments the tick before reading
-    // the phase, so stepping N from T covers T+1..T+N: from 1190, 9 ticks at 1x
-    // (1191..1199) and 11 at 2x (1200..1210), 0.315 + 0.770. Pins per-tick
-    // evaluation, which a schedule sampled once per step() would fail.
-    REQUIRE(incomeOver(GameManager::DOUBLE_ELIXIR_TICK - 10, 20)
-            == Catch::Approx(1.085f).margin(0.01f));
+    // Crossing a boundary mid-window. tick() increments the tick before reading
+    // the phase, so 20 steps (40 ticks) from T cover T+1..T+40: from 1.0 s
+    // before 2:00, 19 ticks at 1x and 21 at 2x, 19 x 0.0175 + 21 x 0.035 =
+    // 0.3325 + 0.735. Pins per-tick evaluation, which a schedule sampled once
+    // per step() would fail (1.05 or 1.4).
+    REQUIRE(incomeOver(GameManager::DOUBLE_ELIXIR_TICK - secs(1.0), 20)
+            == Catch::Approx(1.0675f).margin(0.005f));
 }
 
 TEST_CASE("the elixir phase composes with the curriculum's opponent multiplier",

@@ -50,8 +50,8 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
     // kamikazes Battle Ram and the Spirits, Executioner: 6 cards), the first hit stays the preload model's
     // firstHitTicks (client HitSpeed - LoadTime): the attack starts that much short of the engine's cycle.
     if (entity->clientLoadMs >= 0 && entity->firstHitTicks >= 0) {
-        const int preload = stats.attackCooldown * 100 - entity->firstHitTicks * 100;
-        if (std::abs(preload - entity->clientLoadMs) >= 100) entity->clientLoadMs = std::max(0, preload);
+        const int preload = (stats.attackCooldown - entity->firstHitTicks) * TICK_MS;
+        if (std::abs(preload - entity->clientLoadMs) >= TICK_MS) entity->clientLoadMs = std::max(0, preload);
     }
     entity->loadFirstHit = stats.id >= 0 && loadFirstHitForCard(stats.id);
     entity->specialLoadMs = (stats.id >= 0) ? clientSpecialLoadTimeForCard(stats.id) : 0;

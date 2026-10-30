@@ -52,7 +52,8 @@ private:
     // observation. A plain value, so snapshot() copies it and a rollout
     // inherits the cycle.
     CycleTable lastPlayedTick = neverPlayed();
-    const float ELIXIR_REGEN_RATE = 0.035f;
+    // 0.035 elixir per 100 ms (2.857 s an elixir at 1x), per engine tick.
+    const float ELIXIR_REGEN_RATE = perTick(0.35f);
     // Curriculum hook: scales the opponent's regen. 1.0 is a normal opponent.
     float oppElixirMultiplier = 1.0f;
 
@@ -213,10 +214,13 @@ public:
     // 240.7 s at the median, 51 of 159,041 readings off this schedule. It was
     // triple at 3:00, the end of regulation, before.
     //
-    // In ticks (10 ticks = 1 s, perception/timebase.py). Public because
-    // ClashEnv, the bindings and GameLogger all need it.
-    static constexpr int DOUBLE_ELIXIR_TICK = 1200;   // 2:00
-    static constexpr int TRIPLE_ELIXIR_TICK = 2400;   // 4:00, one minute into overtime
+    // In engine ticks (Tick.h). Public because ClashEnv, the bindings and
+    // GameLogger all need it; they report the *_STEP values, in the API's
+    // 100 ms steps (10 steps = 1 s, perception/timebase.py).
+    static constexpr int DOUBLE_ELIXIR_TICK = secs(120.0);   // 2:00
+    static constexpr int TRIPLE_ELIXIR_TICK = secs(240.0);   // 4:00, one minute into overtime
+    static constexpr int DOUBLE_ELIXIR_STEP = ticksToSteps(DOUBLE_ELIXIR_TICK);   // 1200
+    static constexpr int TRIPLE_ELIXIR_STEP = ticksToSteps(TRIPLE_ELIXIR_TICK);   // 2400
     static_assert(TRIPLE_ELIXIR_TICK > MatchRules::REGULATION_END_TICK,
                   "triple elixir starts inside overtime, not when it begins");
 
@@ -231,6 +235,10 @@ public:
         if (tick >= DOUBLE_ELIXIR_TICK) return 2.0f;
         return 1.0f;
     }
+    // The same at an API step (100 ms), for the bindings.
+    static constexpr float elixirMultiplierAtStep(int step) {
+        return elixirMultiplierAtTick(stepsToTicks(step));
+    }
 
     // The shared phase for both players; oppElixirMultiplier is a separate
     // per-opponent handicap that composes with it (see step()).
@@ -244,7 +252,7 @@ public:
         if (!Fidelity::clientElixirRate) return ELIXIR_REGEN_RATE * phase;
         const int barMs = (phase >= MAX_ELIXIR_MULTIPLIER) ? CLIENT_ELIXIR_FULL_BAR_MS_3X
             : (phase >= 2.0f) ? CLIENT_ELIXIR_FULL_BAR_MS_2X : CLIENT_ELIXIR_FULL_BAR_MS_1X;
-        return 10.0f * 100.0f / static_cast<float>(barMs);
+        return 10.0f * static_cast<float>(TICK_MS) / static_cast<float>(barMs);
     }
 
     PlayerState playerAI;
@@ -625,7 +633,7 @@ public:
     // playCard adopts the bodies spawned with the play. step() calls it with
     // `lateSpawnsOnly`, before each commit, for bodies a spell spawns later and
     // that say so (abilitySlotCardId): Hero Barbarian Barrel's Barbarian lands
-    // ~17 ticks after the play, as a -47 helper, and was never tracked -- its
+    // ~1.7 s after the play, as a -47 helper, and was never tracked -- its
     // ability could not be activated (UPSTREAM_REQUESTS.md item 32a). Only
     // declared bodies, so a Clone copy (which carries isChampion but never a
     // slot: CombatEntity::becomeCloneCopy) is still never adopted.
@@ -722,8 +730,8 @@ public:
         playerOpponent.initializeDeck(oppDeckConfig, rng);
 
         // Tower positions from ArenaLayout.h.
-        addTower(ArenaLayout::CENTER_X, ArenaLayout::kingY(0), 4008, 0, 7.0f, 90, 10, 'R', "King Tower");
-        addTower(ArenaLayout::CENTER_X, ArenaLayout::kingY(1), 4008, 1, 7.0f, 90, 10, 'R', "King Tower");
+        addTower(ArenaLayout::CENTER_X, ArenaLayout::kingY(0), 4008, 0, 7.0f, 90, secs(1.0), 'R', "King Tower");
+        addTower(ArenaLayout::CENTER_X, ArenaLayout::kingY(1), 4008, 1, 7.0f, 90, secs(1.0), 'R', "King Tower");
 
         // Princess Towers, from the configured Tower Troop.
         addTower(ArenaLayout::LEFT_LANE_X,  ArenaLayout::princessY(0), 0, "Princess Tower", towerTroopStats(aiTowerTroop));
@@ -734,7 +742,14 @@ public:
         board.commitPendingEntities(currentTick);
     }
 
+    // One API step: STEP_MS (100 ms) of game time, as TICKS_PER_STEP engine
+    // ticks (Tick.h). Stops at the tick the match ends.
     void step() {
+        for (int i = 0; i < TICKS_PER_STEP && !gameOver; ++i) tick();
+    }
+
+    // One engine tick, TICK_MS of game time.
+    void tick() {
         if (gameOver) return;
 
         currentTick++;
@@ -757,19 +772,17 @@ public:
         trackSlotEntities(1, 0, /*lateSpawnsOnly=*/true);
         board.commitPendingEntities(currentTick);
 
-        // Fidelity::clientCollision: each body pushes itself before its own update, and keeps half its move for
-        // the tick's second 50 ms pass (Board::finishClientPushTick).
+        // Fidelity::clientCollision: one 50 ms client tick. Each body's own move and its separation push are
+        // applied together right after its update, before the next body's (Board::clientMoveStep).
         const bool clientPush = Fidelity::clientCollision;
-        if (clientPush) board.beginClientPushTick();
         const auto& entities = board.getEntities();
         for (size_t i = 0; i < entities.size(); ++i) {
             const auto& entity = entities[i];
             if (!entity->isAlive()) continue;
             if (!clientPush) { entity->update(board); continue; }
-            board.clientSelfPush(*entity);
             const Vector2D before = entity->position;
             entity->update(board);
-            board.holdHalfStep(i, before);
+            board.clientMoveStep(i, before);
         }
 
         // Elixir Collector: drain this tick's grants into the players, with the
@@ -782,7 +795,7 @@ public:
         trackSlotEntities(0, 0, /*lateSpawnsOnly=*/true);
         trackSlotEntities(1, 0, /*lateSpawnsOnly=*/true);
         board.commitPendingEntities(currentTick);
-        if (clientPush) board.finishClientPushTick();
+        if (clientPush) board.settleClientPushTick();
         else board.resolveCollisions();
 
         // evaluateAtTick: from 3:00 a crown lead, or the first crown in
