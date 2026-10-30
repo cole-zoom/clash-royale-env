@@ -37,7 +37,8 @@ public:
 
 protected:
     void moveTowards(Board& board, const Vector2D& dest) override {
-        Vector2D waypoint = riverIgnores ? dest : board.getNextWaypoint(position, dest);
+        Vector2D waypoint = riverIgnores ? dest
+            : board.getNextWaypoint(position, dest, Fidelity::bridgeOwnLine ? 0.0f : -1.0f);
         float dx = waypoint.x - position.x;
         float dy = waypoint.y - position.y;
         float distToWaypoint = position.distanceTo(waypoint);
@@ -59,6 +60,7 @@ protected:
             // bridge mouth back and orbits it forever (UPSTREAM_REQUESTS.md
             // item 31; tests/core/test_board.cpp, [orbit]).
             float step = std::min(currentSpeed, distToWaypoint);
+            if (Fidelity::obstacleSlide && !isFlying) slideAroundObstacles(board, dest, step, dx, dy, distToWaypoint);
             Vector2D newPos;
             newPos.x = position.x + (dx / distToWaypoint) * step;
             newPos.y = position.y + (dy / distToWaypoint) * step;
@@ -99,6 +101,37 @@ protected:
     }
 
 private:
+    // Fidelity::obstacleSlide: if this step runs into a building or tower, or an enemy ground body, that isn't where
+    // the unit is going (`dest` inside it: the unit's target), turn the step onto the tangent, on the side it was
+    // already heading (toward `dest` when it heads straight in; its own right when that's dead centre too), so it
+    // walks around at full speed. A unit fighting a troop is going to it, so this only steers units past what they
+    // ignore (a Giant past enemy troops). (dx, dy) / len is the step's direction.
+    void slideAroundObstacles(const Board& board, const Vector2D& dest, float step, float& dx, float& dy, float len) const {
+        const float ux = dx / len, uy = dy / len, own = bodyRadiusOf(*this);
+        for (const auto& e : board.getEntities()) {
+            if (e->id == id || !e->isAlive()) continue;
+            float rc = e->getCollisionRadius();
+            if (rc <= 0.0f) {  // not a building: an enemy ground body it would push against
+                if (e->team == team || e->isFlying || !e->collidesAsBody(board)) continue;
+                rc = bodyRadiusOf(*e);
+            }
+            const float R = rc + own;
+            const float cx = e->position.x - position.x, cy = e->position.y - position.y;
+            const float d = std::sqrt(cx * cx + cy * cy);
+            if (d < 1e-3f || d > R + step + 0.05f) continue;           // not touching this step
+            if (dest.distanceTo(e->position) <= R) continue;           // where it's going: walk into it
+            const float along = (ux * cx + uy * cy) / d;
+            if (along <= 0.0f) continue;                               // moving away or past it already
+            float tx = -cy / d, ty = cx / d;                           // a tangent
+            float side = tx * ux + ty * uy;
+            if (std::abs(side) < 1e-3f) side = tx * (dest.x - e->position.x) + ty * (dest.y - e->position.y);
+            if (std::abs(side) < 1e-3f) side = tx * uy - ty * ux;      // dead centre on both: keep right
+            if (side < 0.0f) { tx = -tx; ty = -ty; }
+            dx = tx * len; dy = ty * len;                              // same length: the caller divides by it
+            return;
+        }
+    }
+
     // A JumpEnabled troop with its centre over a river cell is mid-jump (Fidelity::clientCollision).
     bool overRiverJump(const Board& board) const {
         return jumpSpeed > 0.0f && riverIgnores && !isFlying && board.isRiverCellAt(position.x, position.y);

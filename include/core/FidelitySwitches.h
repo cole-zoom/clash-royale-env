@@ -88,4 +88,17 @@ struct Fidelity {
     // Buildings keep the engine's static push-out. OFF by default: off = Board::resolveCollisions (pairwise split
     // m2 / (m1 + m2) after every unit has moved, uncapped, with a sideways nudge; the bank snap).
     static inline bool clientCollision = false;
+
+    // ---- Pathing around obstacles (the client routes over tiles: PATHFINDING_* in globals.csv, BUILDING_COST 50 to
+    // a tile's 8, so it walks around towers rather than into them; the engine walks straight and is pushed out) ----
+    // A troop already within a bridge's width walks across on its own line (its x) instead of to the bridge's centre
+    // point; two Giants (body 0.75) fit side by side on the 2-tile bridge. Off: every crossing aims at the centre, so two units meeting on
+    // a bridge are pulled back onto one line and push each other to a stop (Cole's play page, 2026-10-30: two Giants
+    // and Mini P.E.K.K.As stuck on a bridge, "normally they get passed eachother with some difficulty").
+    static inline bool bridgeOwnLine = true;
+    // A troop walking into a building or tower, or an enemy ground body, that isn't where it's going slides along it
+    // at its full speed (the tangent on the side it was already heading; its own right when dead centre), so a Giant
+    // gets past an enemy Giant it ignores. Off: the static push-out leaves only the sideways part of each
+    // step, so a Giant dropped behind its King Tower crawls along it for ~5 s (Cole's play page, 2026-10-30).
+    static inline bool obstacleSlide = true;
 };

@@ -490,7 +490,9 @@ public:
     // the unit freezes for the rest of the match (tests/core/test_board.cpp).
     static constexpr float WAYPOINT_ARRIVAL_EPS = 0.01f;
 
-    Vector2D getNextWaypoint(const Vector2D& currentPos, const Vector2D& targetPos) const {
+    // ownLineMargin >= 0 (Fidelity::bridgeOwnLine, from Troop::moveTowards: the unit's body radius): a unit already
+    // within the bridge's width crosses on its own x, kept that far inside the edges, instead of at the centre.
+    Vector2D getNextWaypoint(const Vector2D& currentPos, const Vector2D& targetPos, float ownLineMargin = -1.0f) const {
         bool isCurrentBelow = currentPos.y <= riverY_start;
         bool isTargetBelow = targetPos.y <= riverY_start;
         bool isCurrentAbove = currentPos.y >= riverY_end;
@@ -504,6 +506,10 @@ public:
         float distToLeft = currentPos.distanceTo(leftBridge);
         float distToRight = currentPos.distanceTo(rightBridge);
         float bridgeX = (distToLeft < distToRight) ? leftBridge.x : rightBridge.x;
+        if (ownLineMargin >= 0.0f && std::abs(currentPos.x - bridgeX) <= BRIDGE_HALF_WIDTH) {
+            const float m = std::min(ownLineMargin, BRIDGE_HALF_WIDTH);
+            bridgeX = std::clamp(currentPos.x, bridgeX - BRIDGE_HALF_WIDTH + m, bridgeX + BRIDGE_HALF_WIDTH - m);
+        }
 
         if (isCurrentBelow) {
             // The bank tests are inclusive, so a unit already on the near bank
