@@ -160,7 +160,8 @@ public:
         deckQueue.pop_front();
         deckQueue.push_back(cardId);
         hand[handIndex] = nextCard;
-        handCooldownTicks[handIndex] = secs(2.0);
+        // 1 s, not 2 (2026-11-06): Battle Log replays, 9,336 cycle-ins, 3 plays under 1.0 s and 182 under 2.0 s.
+        handCooldownTicks[handIndex] = secs(1.0);
 
         bool useEvolvedForm = false;
         if (cardDef->isEvolution) {
