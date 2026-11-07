@@ -298,6 +298,7 @@ public:
     bool startsInvisible = false;
     int revealTicksAfterAttack = 0;
     int visibleTicksRemaining = 0;
+    bool revealWhileTargetInReach = false;  // see CardStats::withInvisibilityWhenNotAttacking
 
     // Periodic effects while alive (Witch, Night Witch, Furnace, huts,
     // Tombstone, Goblin Drill): fires periodicEffect every
@@ -869,6 +870,7 @@ public:
 
             float dist = position.distanceTo(target->position);
             float effectiveAttackRange = effectiveRangeTo(target);
+            if (revealWhileTargetInReach && dist <= effectiveAttackRange) visibleTicksRemaining = revealTicksAfterAttack;
 
             const bool hitStarted = usesPreload() && windupTargetId == target->id && windupTicksLeft > 0;
             const int hookStepMs = stunned ? 0 : static_cast<int>(std::lround(static_cast<float>(TICK_MS) * slowThisTick));
@@ -1198,6 +1200,7 @@ public:
 
         const float dist = position.distanceTo(target->position);
         const float reach = effectiveRangeTo(target);
+        if (revealWhileTargetInReach && dist <= reach) visibleTicksRemaining = revealTicksAfterAttack;
         const int stepMs = clientCycleStepMs(wasFrozen, stunned, slowThisTick);
         const bool advance = dist <= reach
             || (Fidelity::startedSwingFinishes ? swingStarted : (swingStarted && dist <= reach + HIT_CANCEL_DISTANCE));
@@ -1616,7 +1619,9 @@ inline void applyLineSplashDamage(Board& board, const Vector2D& origin, const Ve
         float closestY = origin.y + uy * proj;
         float ddx = entity->position.x - closestX;
         float ddy = entity->position.y - closestY;
-        if (std::sqrt(ddx * ddx + ddy * ddy) > halfWidth) continue;
+        // The line hits what it overlaps: its half-width plus the body's radius, as disc spells do (2026-09-25). On the
+        // centre alone the Magic Archer missed every walking troop it shot (a Knight took 0 in 5 s; Cole, 2026-11-06).
+        if (std::sqrt(ddx * ddx + ddy * ddy) > halfWidth + CombatEntity::effectiveRadiusOf(*entity)) continue;
 
         entity->takeDamage(dealt);
         board.statsEvents.notifyDamageDealt(

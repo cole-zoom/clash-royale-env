@@ -212,6 +212,9 @@ struct CardStats {
     // AllowAreaDmgWhenInvisible).
     bool startsInvisible = false;
     int revealTicksAfterAttack = 0;
+    // Visible the whole time a target is in attack reach, not only after a hit (client BuffWhenNotAttacking with
+    // BuffWhenNotAttackingUseAttackRange: Royal Ghost).
+    bool revealWhileTargetInReach = false;
 
     // Compound cards (Goblin Giant, Ram Rider, Goblin Machine, Goblin Gang,
     // Rascals): a second, independently targeting unit spawned at the same
@@ -484,6 +487,12 @@ struct CardStats {
     CardStats& withInvisibility(int revealTicks) {
         startsInvisible = true;
         revealTicksAfterAttack = revealTicks;
+        return *this;
+    }
+    // Invisible only after `hideTicks` with no target in attack reach (client BuffWhenNotAttackingTime).
+    CardStats& withInvisibilityWhenNotAttacking(int hideTicks) {
+        withInvisibility(hideTicks);
+        revealWhileTargetInReach = true;
         return *this;
     }
     CardStats& withPeriodicEffect(int intervalTicks, std::shared_ptr<IPeriodicEffect> effect) {

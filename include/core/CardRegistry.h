@@ -744,7 +744,10 @@ private:
         // Royal Ghost jumps the river.
         // client ghost.toml Hitpoints 450 -> 1152, AreaDamageRadius 1.0 (was 1210, single-target) (2026-10-28)
         add(troop(47, "Royal Ghost", 3.0f, Archetype::MeleeSquad, 1152, SPEED_FAST, 1.2f, 261, secs(1.8), 'Q').withSplash(1.0f)
-            .withInvisibility(secs(0.5)) // brief reveal after attacking
+            // client ghost.toml BuffWhenNotAttackingTime 2000 (UseAttackRange): visible while a target is in reach,
+            // invisible 2.0 s after it last had one (was a 0.5 s reveal after each hit, so cloaked most of a fight;
+            // Cole, 2026-11-06)
+            .withInvisibilityWhenNotAttacking(secs(2.0))
             .withIgnoresRiver());
         // Mega Knight: the deploy slam is the spawn-effect burst (radius 1.3,
         // 430). The periodic jump closes 3.5-5 tiles instantly with a 2.0x,
@@ -1402,7 +1405,7 @@ private:
         // anyway.
         addEvolution(136,
             troop(47, "Royal Ghost", 3.0f, Archetype::MeleeSquad, 1152, SPEED_FAST, 1.2f, 261, secs(1.8), 'Q').withSplash(1.0f)
-                .withInvisibility(secs(0.5)).withIgnoresRiver(),
+                .withInvisibilityWhenNotAttacking(secs(2.0)).withIgnoresRiver(),
             troop(47, "Royal Ghost", 3.0f, Archetype::MeleeSquad, 1152, SPEED_FAST, 1.2f, 261, secs(1.8), 'Q').withSplash(1.0f)
                 .withInvisibility(secs(1.8))
                 .withOnHitSpawn(std::make_shared<PeriodicSpawnEffect>(royalGhostSouldierStats()
@@ -1413,11 +1416,13 @@ private:
         // Baby Dragon: the real aura (30% enemy slow, 30% ally speed-up) is
         // approximated as an ally damage buff per landed hit; there is no
         // movement-speed buff here.
+        // Both forms splash 1.5 like the base card (BabyDragonProjectile Radius 1500); they were single-target
+        // (Cole, 2026-11-06).
         addEvolution(137,
             troop(44, "Baby Dragon", 4.0f, Archetype::RangedSquad, 1152, SPEED_FAST, 3.5f, 168, secs(1.5), 'y')
-                .withFlying().withTargetsAir(),
+                .withFlying().withTargetsAir().withSplash(1.5f),
             troop(44, "Baby Dragon", 4.0f, Archetype::RangedSquad, 1152, SPEED_FAST, 3.5f, 168, secs(1.5), 'y')
-                .withFlying().withTargetsAir()
+                .withFlying().withTargetsAir().withSplash(1.5f)
                 .withAllyBuffAura(4.0f, 1, 1.3f, secs(2.0), 1000000),
             2, 1);
 
