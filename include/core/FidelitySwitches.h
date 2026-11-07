@@ -62,9 +62,11 @@ struct Fidelity {
     // The King's first shot comes King LoadTime 500 ms after it acquires a target (HitSpeed 1000 - 500, spawned
     // loaded), then every HitSpeed, through the client attack cycle. Off: it fires on acquiring.
     static inline bool kingFirstShotDelay = true;
-    // The Princess Tower's first arrow comes HitSpeed (800 ms) after it acquires from idle (no LoadTime). OFF by
-    // default: Cole's "fires right away" against the code; lab L18 decides.
-    static inline bool princessFirstShotDelay = false;
+    // The Princess Tower's first arrow comes HitSpeed (800 ms) after it acquires from idle (no LoadTime), through the
+    // client attack cycle, so a started arrow still flies at a target kited out of reach. ON since 2026-11-06: Cole's
+    // live clip (three Mini P.E.K.K.A kites) shows the first arrow ~1 s after the troop enters reach and arrows still
+    // coming at 9.9-10.4 tiles; on, the engine's last hit lands at 10.2 (off: 9.4).
+    static inline bool princessFirstShotDelay = true;
     // Attack reach to a crown tower is measured to its tile footprint (Princess 3x3: 1.5, King 4x4: 2.0, the same
     // radii as targeting) instead of its CollisionRadius (1.0 / 1.4). Lab night 1: a Giant (L04) and a Hog (L18) hit
     // the tower 1.0 s and 0.2 s before the engine's, at matching positions, which the 0.5-tile difference explains

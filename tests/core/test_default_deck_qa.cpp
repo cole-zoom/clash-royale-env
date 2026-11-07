@@ -293,8 +293,9 @@ TEST_CASE("the Cannon fully answers a lone Hog Rider", "[deck_qa][defence]") {
     // 2026-10-29 (the preload model) the Cannon's first shot comes 0.9 s after
     // it acquires the Hog (client HitSpeed 1000 - LoadTime 100), so a Cannon
     // dropped this late lets the Hog land two swings (634), not one; was * 5.
-    // UNCONFIRMED against the real game: a question for Cole.
-    REQUIRE(withCannon * 3 < unanswered);
+    // UNCONFIRMED against the real game: a question for Cole. Since 2026-11-06 the Princess Tower's first arrow also
+    // waits its 0.8 s cycle (princessFirstShotDelay), which costs the late Cannon a little more: 2853 vs 2851 at * 3.
+    REQUIRE(withCannon * 5 < unanswered * 2);
 }
 
 TEST_CASE("Skeletons and a Musketeer both blunt a Hog, a Hog does not",

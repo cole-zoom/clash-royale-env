@@ -490,7 +490,7 @@ TEST_CASE("Random-hand initializeDeck seeds championSlots by ORIGINAL deck index
     }
 }
 
-TEST_CASE("A freshly-cycled-in hand slot is unplayable for 19 ticks, playable on the 20th -- the opening hand needs no such wait",
+TEST_CASE("A freshly-cycled-in hand slot is unplayable for 1 s less a tick, playable on the next -- the opening hand needs no such wait",
         "[player_state][cycle_delay]") {
     PlayerState player;
     player.initializeDeck({ 0, 1, 2, 3, 4, 5, 6, 7 }); // deterministic overload: hand={0,1,2,3}, queue={4,5,6,7}
@@ -500,10 +500,10 @@ TEST_CASE("A freshly-cycled-in hand slot is unplayable for 19 ticks, playable on
     auto opening = player.playCard(0);
     REQUIRE(opening.cardId == 0);
 
-    // hand[0] is now 4, cycled in from the queue with a fresh 2.0 s cooldown:
-    // unplayable for all but its last tick...
+    // hand[0] is now 4, cycled in from the queue with a fresh 1.0 s cooldown (2.0 until 2026-11-06, Battle Log
+    // replays): unplayable for all but its last tick...
     REQUIRE(player.hand[0] == 4);
-    for (int i = 0; i < secs(2.0) - 1; ++i) {
+    for (int i = 0; i < secs(1.0) - 1; ++i) {
         auto blocked = player.playCard(0);
         REQUIRE(blocked.cardId == -1); // still cooling down
         REQUIRE(player.hand[0] == 4);  // nothing consumed, hand slot untouched

@@ -74,7 +74,7 @@ TEST_CASE("client cycle values come from the client tables", "[client_cycle]") {
     REQUIRE(clientSpecialLoadTimeForCard(KNIGHT) == 0);
     REQUIRE(CLIENT_ELIXIR_FULL_BAR_MS_1X == 28000);
     REQUIRE(Fidelity::reloadFromAttackStart);
-    REQUIRE_FALSE(Fidelity::princessFirstShotDelay);       // waits for lab L18
+    REQUIRE(Fidelity::princessFirstShotDelay);             // on 2026-11-06 (Cole's kite clip)
     REQUIRE_FALSE(Fidelity::clientElixirRate);             // for Cole to decide
 }
 
@@ -408,7 +408,7 @@ TEST_CASE("GameManager gives the crown towers their client load", "[client_cycle
         auto t = std::dynamic_pointer_cast<Tower>(e);
         if (!t) continue;
         if (t->symbol == 'R') { ++kings; REQUIRE(t->clientLoadMs == 500); REQUIRE(t->clientCycleOn()); }
-        else { ++princesses; REQUIRE(t->clientLoadMs == 0); REQUIRE_FALSE(t->clientCycleOn()); }
+        else { ++princesses; REQUIRE(t->clientLoadMs == 0); REQUIRE(t->clientCycleOn()); }  // princessFirstShotDelay on
     }
     REQUIRE(kings == 2);
     REQUIRE(princesses == 4);
