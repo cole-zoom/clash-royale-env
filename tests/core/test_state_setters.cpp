@@ -471,3 +471,29 @@ TEST_CASE("the item 22 setters survive a snapshot", "[setters][snapshot]") {
                        + ClashEnv::HAND_SIZE * ClashEnv::NUM_CARD_IDS;
     REQUIRE(copy.getObservationForTeam(0)[clockIdx] == Catch::Approx(0.3f));
 }
+
+TEST_CASE("inject with bodies keeps that many of a multi-body card", "[setters][inject]") {
+    std::vector<int> deck = DECK;
+    ClashEnv env(deck, deck, 100);
+    env.reset();
+    Board& board = env.debugGame().getBoard();
+
+    env.inject(4, 9.0f, 20.0f, 1);  // Goblins: the whole card, as before
+    const size_t whole = board.pendingEntityCount();
+    REQUIRE(whole > 1);
+
+    env.inject(4, 5.0f, 22.0f, 1, -1.0f, -1, 1);  // one Goblin, exactly where it was seen
+    REQUIRE(board.pendingEntityCount() == whole + 1);
+    const auto& one = board.getPendingEntity(whole);
+    REQUIRE(one->position.x == Catch::Approx(5.0f));
+    REQUIRE(one->position.y == Catch::Approx(22.0f));
+
+    env.inject(4, 9.0f, 20.0f, 1, 50.0f, 0, 2);  // hp and deploy overrides reach only the kept bodies
+    REQUIRE(board.pendingEntityCount() == whole + 3);
+    REQUIRE(board.getPendingEntity(whole + 1)->hp == 50);
+    REQUIRE(board.getPendingEntity(whole + 2)->hp == 50);
+
+    env.inject(15, 9.0f, 20.0f, 1, -1.0f, -1, 1);  // a one-body card is unchanged by bodies = 1
+    REQUIRE(board.pendingEntityCount() == whole + 4);
+    REQUIRE(board.getPendingEntity(whole + 3)->hp == 1697);
+}

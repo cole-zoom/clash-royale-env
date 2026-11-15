@@ -619,8 +619,12 @@ public:
     // Pass deployTicks = 0 for a unit perception can already see:
     // applyCardMetadata otherwise hands every injected unit a fresh deploy
     // second, including one that has been walking for six.
+    // bodies >= 1 keeps only that many of the bodies the card spawns (a state estimator sees one Goblin of three,
+    // not the whole card); with bodies == 1 the kept body stands exactly at (x, y) (set before it is active, so not a forced move). Only for cards whose bodies are
+    // independent troops (Skeletons, Goblins, Barbarians, Minions...): a card that spawns linked entities (a rider on
+    // its mount) must keep all of them.
     void inject(int cardId, float x, float y, int team,
-                float hp = -1.0f, int deployTicks = -1) {
+                float hp = -1.0f, int deployTicks = -1, int bodies = -1) {
         const auto* card = CardRegistry::getInstance().getCard(cardId);
         if (!card) return;
         Board& board = game.getBoard();
@@ -631,6 +635,14 @@ public:
         {
             Board::LevelScope level(board, game.cardLevelMult(team, cardId));   // at the team's card level
             card->spawnEntity(x, y, team, board);
+        }
+        if (bodies >= 1 && board.pendingEntityCount() > before + static_cast<size_t>(bodies)) {
+            board.truncatePending(before + static_cast<size_t>(bodies));
+            if (bodies == 1) {
+                const std::shared_ptr<Entity>& e = board.getPendingEntity(before);
+                e->position.x = x;
+                e->position.y = y;
+            }
         }
         if (hp < 0.0f && deployTicks < 0) return;   // nothing to override
         for (size_t i = before; i < board.pendingEntityCount(); ++i) {

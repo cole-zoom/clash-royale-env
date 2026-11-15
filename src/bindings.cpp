@@ -113,7 +113,8 @@ PYBIND11_MODULE(clash_royale_env, m) {
         // deploy_ticks=0 for a unit perception can already see, or every
         // rollout grants it an extra second.
         .def("inject", &ClashEnv::inject, py::arg("card_id"), py::arg("x"), py::arg("y"),
-             py::arg("team"), py::arg("hp") = -1.0f, py::arg("deploy_ticks") = -1)
+             py::arg("team"), py::arg("hp") = -1.0f, py::arg("deploy_ticks") = -1,
+             py::arg("bodies") = -1)
         .def("set_opponent_deck", &ClashEnv::setOpponentDeck, py::arg("deck"))
         .def("set_opponent_elixir_multiplier", &ClashEnv::setOpponentElixirMultiplier, py::arg("multiplier"))
         .def("save_log", &ClashEnv::saveLog, py::arg("filepath"))

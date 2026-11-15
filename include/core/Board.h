@@ -179,6 +179,8 @@ public:
     // spawnEntity returns nothing.
     size_t pendingEntityCount() const { return pendingEntities.size(); }
     const std::shared_ptr<Entity>& getPendingEntity(size_t index) const { return pendingEntities[index]; }
+    // Drops pending entities from `count` on (ClashEnv::inject's `bodies`: one body of a multi-body card).
+    void truncatePending(size_t count) { if (count < pendingEntities.size()) pendingEntities.resize(count); }
 
     // GameManager::step passes the real tick; tests call it without one.
     void commitPendingEntities(int tick = 0) {
