@@ -38,6 +38,11 @@ public:
         return std::make_shared<RangedTroop>(*this);
     }
 
+    void applyCardLevel(int mult) override {
+        Troop::applyCardLevel(mult);
+        meleeAltDamage = scaleByLevel(meleeAltDamage, mult);
+    }
+
 protected:
     void performAttack(Board& board, std::shared_ptr<Entity> target) override {
         if (meleeAltRange > 0.0f && !target->isFlying

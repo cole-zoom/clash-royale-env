@@ -35,6 +35,9 @@ public:
         if (lineLen <= 0.01f) return;
         float ux = dx / lineLen, uy = dy / lineLen;
 
+        // Card level (CardLevels.h): the roll's damage and the hp cap of the heal.
+        const int rollDamage = scaleByLevel(this->rollDamage, self.levelMult);
+        const int maxHp = scaleByLevel(this->maxHp, self.levelMult);
         int totalDealt = 0;
         for (const auto& entity : board.getEntities()) {
             if (entity->id == self.id) continue;

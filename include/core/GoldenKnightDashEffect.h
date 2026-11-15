@@ -32,6 +32,7 @@ public:
         : dashDamage(dashDamage), dashRange(dashRange), maxDashes(maxDashes) {}
 
     void apply(Board& board, CombatEntity& self) const override {
+        const int dashDamage = scaleByLevel(this->dashDamage, self.levelMult);   // card level (CardLevels.h)
         for (int i = 0; i < maxDashes; ++i) {
             auto target = findNearestEnemy(board, self);
             if (!target) break;

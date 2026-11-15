@@ -33,6 +33,11 @@ public:
 
     bool isBuilding() const override { return true; }
 
+    void applyCardLevel(int mult) override {
+        CombatEntity::applyCardLevel(mult);
+        maxHp = scaleByLevel(maxHp, mult);
+    }
+
     // For Board::deepCopy. Copies ticksAlive, so a snapshot keeps its place in
     // the decay schedule.
     std::shared_ptr<Entity> snapshot() const override {

@@ -52,6 +52,16 @@ private:
     // observation. A plain value, so snapshot() copies it and a rollout
     // inherits the cycle.
     CycleTable lastPlayedTick = neverPlayed();
+
+    // [team][cardId] -> the card's level as its PowerLevelMultiplier (CardLevels.h), CARD_LEVEL_BASE_MULT (level
+    // 11, the registry's) unless set. Per-match setup like the decks: reset() keeps it, snapshot() copies it.
+    using LevelTable = std::array<std::array<int, CARD_ID_COUNT>, 2>;
+    static constexpr LevelTable baseLevels() {
+        LevelTable t{};
+        for (auto& perTeam : t) for (auto& v : perTeam) v = CARD_LEVEL_BASE_MULT;
+        return t;
+    }
+    LevelTable cardLevelMults = baseLevels();
     // 0.035 elixir per 100 ms (2.857 s an elixir at 1x), per engine tick.
     const float ELIXIR_REGEN_RATE = perTick(0.35f);
     // Curriculum hook: scales the opponent's regen. 1.0 is a normal opponent.
@@ -280,8 +290,29 @@ public:
         oppDeckConfig = deck;
     }
 
+    // Card levels (CardLevels.h). `cardId` is the id the deck holds (an Evolution's own id for its slot); what
+    // the card spawns, then and later, takes the same level. Throws on a team, card id or level out of range.
+    void setCardLevel(int team, int cardId, int level) {
+        checkLevelKey(team, cardId);
+        cardLevelMults[team][cardId] = cardLevelMultiplier(level);
+    }
+    int getCardLevel(int team, int cardId) const {
+        checkLevelKey(team, cardId);
+        return cardLevelForMultiplier(cardLevelMults[team][cardId]);
+    }
+    // The multiplier a play of `cardId` by `team` spawns at; the base level for an id outside the table.
+    int cardLevelMult(int team, int cardId) const {
+        if (team < 0 || team > 1 || cardId < 0 || cardId >= CARD_ID_COUNT) return CARD_LEVEL_BASE_MULT;
+        return cardLevelMults[team][cardId];
+    }
+
     void setOpponentElixirMultiplier(float multiplier) {
         oppElixirMultiplier = std::max(0.0f, multiplier);
+    }
+
+    static void checkLevelKey(int team, int cardId) {
+        if (team < 0 || team > 1) throw std::invalid_argument("card level: team must be 0 or 1");
+        if (cardId < 0 || cardId >= CARD_ID_COUNT) throw std::invalid_argument("card level: card id out of range");
     }
 
     Board& getBoard() { return board; }
@@ -611,6 +642,9 @@ public:
         PlayerState::PlayCardResult result = player.playCard(handIndex, costOverride);
         if (result.cardId != -1) {
             size_t pendingBefore = board.pendingEntityCount();
+            // At the played card's level; a Mirror copy at the mirrored card's (not the real game's Mirror
+            // level + 1, which would change play with no levels set).
+            Board::LevelScope level(board, cardLevelMult(team, isMirror ? player.lastPlayedCardId : targetCardId));
             if (isSpiritEmpress) {
                 bool flying = (costOverride >= 6.0f);
                 CardFactories::spawn(flying ? spiritEmpressFlyingStats() : spiritEmpressGroundStats(), x, y, team, board);
@@ -709,7 +743,10 @@ public:
             if (player.elixir < champion->abilityElixirCost) return false;
 
             player.elixir -= champion->abilityElixirCost;
-            champion->activateAbility(board);
+            {
+                Board::LevelScope level(board, champion->levelMult);
+                champion->activateAbility(board);
+            }
             board.statsEvents.notifyChampionAbilityActivated({ team, champion->cardId, champion->abilityElixirCost, currentTick });
             return true;
         }
@@ -724,7 +761,10 @@ public:
         const CardDefinition* slotDef = CardRegistry::getInstance().getCard(deckConfig[slot]);
 
         player.elixir -= slotDef->abilityElixirCost;
-        slotDef->postDeathAbilityEffect->apply(board, slotState.lastSquadWipePosition, team);
+        {
+            Board::LevelScope level(board, cardLevelMult(team, deckConfig[slot]));
+            slotDef->postDeathAbilityEffect->apply(board, slotState.lastSquadWipePosition, team);
+        }
         slotState.lastSquadWipeTick = -1; // consumed until the squad is redeployed and wiped again
         board.statsEvents.notifyChampionAbilityActivated({ team, deckConfig[slot], slotDef->abilityElixirCost, currentTick });
         return true;
@@ -800,6 +840,8 @@ public:
         for (size_t i = 0; i < entities.size(); ++i) {
             const auto& entity = entities[i];
             if (!entity->isAlive()) continue;
+            // What an entity spawns or creates this tick takes its card level (Board::addEntity).
+            Board::LevelScope level(board, entity->levelMult);
             if (!clientPush) { entity->update(board); continue; }
             const Vector2D before = entity->position;
             entity->update(board);

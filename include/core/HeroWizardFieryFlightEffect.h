@@ -22,7 +22,7 @@ public:
         self.temporaryFlightTicksRemaining = durationTicks;
         self.flightPulseTicksRemaining = durationTicks;
         self.flightPulseRadius = pulseRadius;
-        self.flightPulseDamage = pulseDamage;
+        self.flightPulseDamage = scaleByLevel(pulseDamage, self.levelMult);   // card level (CardLevels.h)
         self.flightPulsePullDistance = pulsePullDistance;
     }
 };

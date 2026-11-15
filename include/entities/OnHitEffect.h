@@ -14,4 +14,7 @@ class IOnHitEffect {
 public:
     virtual ~IOnHitEffect() = default;
     virtual void apply(std::shared_ptr<CombatEntity> target) const = 0;
+    // A copy dealing its damage at card level `mult` (CardLevels.h), or nullptr when the effect deals none
+    // (slows, stuns, curses). Used once, when the entity carrying it is levelled.
+    virtual std::shared_ptr<IOnHitEffect> atLevel(int mult) const { (void)mult; return nullptr; }
 };

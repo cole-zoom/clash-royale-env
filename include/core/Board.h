@@ -154,7 +154,24 @@ public:
         return (x < centerX - BACK_ROW_OPENING_HALF_WIDTH) || (x > centerX + BACK_ROW_OPENING_HALF_WIDTH);
     }
 
+    // The card level (CardLevels.h, as its multiplier) that entities added now are spawned at: set by
+    // LevelScope around a card play (GameManager::playCard, ClashEnv::inject) and around each entity's update,
+    // death and ability, so what an entity spawns takes its level. The base level outside any scope.
+    int spawnLevelMult = CARD_LEVEL_BASE_MULT;
+
+    struct LevelScope {
+        Board& board;
+        int previous;
+        LevelScope(Board& b, int mult) : board(b), previous(b.spawnLevelMult) { b.spawnLevelMult = mult; }
+        ~LevelScope() { board.spawnLevelMult = previous; }
+        LevelScope(const LevelScope&) = delete;
+        LevelScope& operator=(const LevelScope&) = delete;
+    };
+
+    // A new entity takes the current spawn level once (Entity::applyCardLevel); a copy that already carries one
+    // (a Clone copy) keeps it.
     void addEntity(std::shared_ptr<Entity> entity) {
+        if (!entity->levelApplied) entity->applyCardLevel(spawnLevelMult);
         pendingEntities.push_back(entity);
     }
 
@@ -192,6 +209,7 @@ public:
         // Death effects fire before the erase, via Entity::onDeath.
         for (const auto& e : activeEntities) {
             if (!e->isAlive()) {
+                LevelScope level(*this, e->levelMult);
                 e->onDeath(*this);
                 statsEvents.notifyEntityDied({ e->id, e->cardId, e->team, tick });
             }

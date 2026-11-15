@@ -17,4 +17,8 @@ public:
     void apply(std::shared_ptr<CombatEntity> target) const override {
         target->applyDot(damagePerTick, totalTicks, tickInterval);
     }
+
+    std::shared_ptr<IOnHitEffect> atLevel(int mult) const override {
+        return std::make_shared<PoisonOnHit>(scaleByLevel(damagePerTick, mult), totalTicks, tickInterval);
+    }
 };

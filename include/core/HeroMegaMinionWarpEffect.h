@@ -18,6 +18,7 @@ public:
         auto victim = findHpExtremeEnemy(board, self.position, 0.0f, self.team, /*wantHighestHp=*/false);
         if (!victim) return;
         self.position = victim->position;
+        const int bonusDamage = scaleByLevel(this->bonusDamage, self.levelMult);   // card level (CardLevels.h)
         victim->takeDamage(bonusDamage);
         board.statsEvents.notifyDamageDealt(
             { self.id, self.team, self.cardId, victim->id, victim->cardId, victim->team, bonusDamage, board.currentTick, victim->isTower() });

@@ -164,6 +164,11 @@ PYBIND11_MODULE(clash_royale_env, m) {
         // shot, cooldown in API steps (100 ms). Keeps the hp fraction. Defaults unchanged.
         .def("set_tower_stats", &ClashEnv::setTowerStats, py::arg("team"), py::arg("slot"),
              py::arg("max_hp"), py::arg("damage"), py::arg("cooldown_ticks"))
+        // Play a card at its real level (1..20; default 11, the registry's stats): hp and every damage figure
+        // scale by rarities.csv's PowerLevelMultiplier, and what the card spawns takes the same level. Per team
+        // and card id (the id the deck holds); kept by reset(), copied by snapshot(). Raises on a bad level.
+        .def("set_card_level", &ClashEnv::setCardLevel, py::arg("team"), py::arg("card_id"), py::arg("level"))
+        .def("get_card_level", &ClashEnv::getCardLevel, py::arg("team"), py::arg("card_id"))
         // Every live entity (towers, troops, buildings, spells in flight), for
         // comparing a simulation with real unit tracks. Read-only.
         .def("get_units", &ClashEnv::getUnits)

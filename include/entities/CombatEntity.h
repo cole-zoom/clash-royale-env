@@ -693,6 +693,24 @@ public:
         }
     }
 
+    // Card level (CardLevels.h): hitpoints, shield and every damage figure this entity deals, scaled once at
+    // spawn, after CardFactories::applyCardMetadata. Charge, jump, ramp, burst, split and crown-tower fractions
+    // multiply `damage` and so follow it; an ability's raw damage is scaled by the effect (levelMult).
+    void applyCardLevel(int mult) override {
+        CardEntity::applyCardLevel(mult);
+        if (mult == CARD_LEVEL_BASE_MULT) return;
+        hp = scaleByLevel(hp, mult);
+        damage = scaleByLevel(damage, mult);
+        shieldHp = scaleByLevel(shieldHp, mult);
+        transformCheckMaxHp = scaleByLevel(transformCheckMaxHp, mult);
+        healOnHitMaxHp = scaleByLevel(healOnHitMaxHp, mult);
+        onHitPullDamage = scaleByLevel(onHitPullDamage, mult);
+        for (int& d : attackSequenceDamage) d = scaleByLevel(d, mult);
+        for (auto& effect : onHitEffects) {
+            if (auto leveled = effect->atLevel(mult)) effect = std::move(leveled);
+        }
+    }
+
     // Composes extra behaviour onto every successful attack.
     void addOnHitEffect(std::shared_ptr<IOnHitEffect> effect) {
         onHitEffects.push_back(std::move(effect));

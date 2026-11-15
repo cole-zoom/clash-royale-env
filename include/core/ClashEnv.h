@@ -606,6 +606,7 @@ public:
     void injectEnemy(int cardId, float x, float y) {
         const auto* card = CardRegistry::getInstance().getCard(cardId);
         if (card) {
+            Board::LevelScope level(game.getBoard(), game.cardLevelMult(1, cardId));
             card->spawnEntity(x, y, 1, game.getBoard());
         }
     }
@@ -627,7 +628,10 @@ public:
         // whole range, so a multi-body card (Skeletons: three) is overridden
         // for every body.
         const size_t before = board.pendingEntityCount();
-        card->spawnEntity(x, y, team, board);
+        {
+            Board::LevelScope level(board, game.cardLevelMult(team, cardId));   // at the team's card level
+            card->spawnEntity(x, y, team, board);
+        }
         if (hp < 0.0f && deployTicks < 0) return;   // nothing to override
         for (size_t i = before; i < board.pendingEntityCount(); ++i) {
             const std::shared_ptr<Entity>& e = board.getPendingEntity(i);
@@ -667,6 +671,9 @@ public:
         return game.setTowerStats(team, slot, maxHp, damage, stepsToTicks(cooldownTicks));
     }
     bool destroyTower(int team, int slot) { return game.destroyTower(team, slot); }
+    // Card levels 1..20 per team and card id (CardLevels.h; level 11 = the registry's stats). Kept by reset().
+    void setCardLevel(int team, int cardId, int level) { game.setCardLevel(team, cardId, level); }
+    int getCardLevel(int team, int cardId) const { return game.getCardLevel(team, cardId); }
     bool wakeKing(int team) { return game.wakeKing(team); }
     bool isKingAwake(int team) { return game.isKingAwake(team); }
     int getTowerHp(int team, int slot) const { return game.getTowerHp(team, slot); }

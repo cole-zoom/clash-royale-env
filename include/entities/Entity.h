@@ -6,6 +6,7 @@
 #include <typeinfo>
 #include <unordered_map>
 #include "FidelitySwitches.h"
+#include "CardLevels.h"
 
 struct Vector2D {
     float x, y;
@@ -49,6 +50,19 @@ public:
     virtual void update(Board& board) = 0;
 
     virtual void takeDamage(int amount) { hp -= amount; }
+
+    // The card level this entity was spawned at, as its PowerLevelMultiplier (CardLevels.h; 256 = level 11, the
+    // registry's). Stamped once by Board::addEntity, which scales the entity's hp and damage through
+    // applyCardLevel; a copy (snapshot, Clone) keeps both fields and is never scaled again.
+    int levelMult = CARD_LEVEL_BASE_MULT;
+    bool levelApplied = false;
+
+    // Scales this entity's level-11 stats to `mult`. The base only stamps: a projectile's damage is already its
+    // shooter's scaled damage. CombatEntity and AreaSpell override it.
+    virtual void applyCardLevel(int mult) {
+        levelMult = mult;
+        levelApplied = true;
+    }
 
     bool isAlive() const { return hp > 0; }
 

@@ -21,6 +21,8 @@ public:
         : radius(radius), damage(damage), onHit(std::move(onHit)) {}
 
     void apply(Board& board, const Vector2D& position, int team) const override {
+        // At the dying unit's card level (Board::cleanDeadEntities sets it).
+        const int dealt = scaleByLevel(damage, board.spawnLevelMult);
         for (const auto& entity : board.getEntities()) {
             if (entity->team == team || !entity->isAlive() || !entity->isAreaHittable()) continue;
             // Hits what the blast overlaps (radius plus the target's own radius), as AreaSpell and the delayed
@@ -28,7 +30,7 @@ public:
             // Princess Tower (client: Range 0.35, explosion 2.0) never reached the tower's centre 2.35 away
             // (2026-10-28).
             if (position.distanceTo(entity->position) > radius + CombatEntity::effectiveRadiusOf(*entity)) continue;
-            entity->takeDamage(damage);
+            entity->takeDamage(dealt);
             if (onHit) {
                 if (auto combatTarget = std::dynamic_pointer_cast<CombatEntity>(entity)) {
                     onHit->apply(combatTarget);

@@ -15,7 +15,7 @@ public:
         : hpBonus(hpBonus), damageMultiplier(damageMultiplier) {}
 
     void apply(Board&, CombatEntity& self) const override {
-        self.hp += hpBonus;
+        self.hp += scaleByLevel(hpBonus, self.levelMult);   // card level (CardLevels.h)
         // 999999 ticks: lasts the rest of the deployment.
         self.applyBuff(damageMultiplier, 999999);
     }

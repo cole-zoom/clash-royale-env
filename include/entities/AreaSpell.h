@@ -5,6 +5,7 @@
 #include "PeriodicEffect.h"
 #include "Board.h"
 #include "StatsEvents.h"
+#include "SpellTowerDamage.h"
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -120,6 +121,33 @@ public:
     // original is.
     std::shared_ptr<Entity> snapshot() const override {
         return std::make_shared<AreaSpell>(*this);
+    }
+
+    // Card level (CardLevels.h): the troop, tiered, building and crown-tower damage, and a damaging on-hit
+    // effect. A crown-tower figure the registry derived from the card's CrownTowerDamagePercent
+    // (CardRegistry::withCrownTowerDamage, rounded) is re-derived from the scaled damage with the same fraction;
+    // a published one (Poison) is scaled like the rest. Board::addEntity calls it after spawnSpell has set the
+    // post-construction fields.
+    void applyCardLevel(int mult) override {
+        const int baseDamage = damage;
+        CardEntity::applyCardLevel(mult);
+        if (mult == CARD_LEVEL_BASE_MULT) return;
+        damage = scaleByLevel(damage, mult);
+        tierSingleDamage = scaleByLevel(tierSingleDamage, mult);
+        tierFewDamage = scaleByLevel(tierFewDamage, mult);
+        tierManyDamage = scaleByLevel(tierManyDamage, mult);
+        if (buildingDamage >= 0) buildingDamage = scaleByLevel(buildingDamage, mult);
+        if (crownTowerDamage >= 0) {
+            const float frac = crownTowerFractionForCard(cardId);
+            if (frac >= 0.0f && crownTowerDamage == static_cast<int>(baseDamage * frac + 0.5f)) {
+                crownTowerDamage = static_cast<int>(damage * frac + 0.5f);
+            } else {
+                crownTowerDamage = scaleByLevel(crownTowerDamage, mult);
+            }
+        }
+        if (onHit) {
+            if (auto leveled = onHit->atLevel(mult)) onHit = std::move(leveled);
+        }
     }
 
     // --- rolling sweep (The Log, Barbarian Barrel) ---

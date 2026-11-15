@@ -56,6 +56,9 @@ public:
         return std::make_shared<Tower>(*this);
     }
 
+    // Crown towers are levelled by setStats (set_tower_stats), never by a card level.
+    void applyCardLevel(int mult) override { Entity::applyCardLevel(mult); }
+
     // --- activation ---
     // The King Tower starts dormant: it cannot acquire or fire until woken,
     // permanently, by taking any damage or by losing a friendly Princess Tower.
